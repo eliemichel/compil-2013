@@ -1,23 +1,54 @@
-CMX=parser.cmx lexer.cmx main.cmx
-GEN=lexer.ml
+CMX=ast.cmx parser.cmx lexer.cmx main.cmx
+GEN=lexer.ml parser.ml parser.mli
 BIN=minic++
+LIBS=
 
+
+NO_COLOR=\033[0m
+OK_COLOR=\033[32;01m
+ERROR_COLOR=\033[31;01m
+WARN_COLOR=\033[33;01m
+HIGHLIGHT_COLOR=\033[1m
 
 all: $(BIN)
-	./$(BIN) --parse-only test.cpp
+	@echo "$(HIGHLIGHT_COLOR)  ./$(BIN)$(NO_COLOR)"
+	@./$(BIN)
+
 
 $(BIN): $(CMX)
-	ocamlopt -o $(BIN) $(CMX)
+	@echo "Linking for $(BIN)..."
+	@ocamlopt -o $(BIN) $(LIBS) $(CMX)
+	@echo "$(OK_COLOR)Done.$(NO_COLOR)"
 
-.SUFFIXES: .ml .cmx .mll
+.SUFFIXES: .mli .ml .cmi .cmx .mll .mly
 
-.ml.cmx:
+.mli.cmi:
+	ocamlopt -c $<
+
+.ml.cmx: 
 	ocamlopt -c $<
 
 .mll.ml:
 	ocamllex $<
 
-clean:
-	rm -f *.cmi *.o *~ $(BIN) $(CMX) $(GEN)
+.mly.ml:
+	menhir -v $<
 
+.mly.mli:
+	menhir -v $<
+
+.PHONY: clean
+
+clean:
+	@echo "Cleaning directory..."
+	@rm -v -f .depend *.cmi *.o *.automaton *.conflicts *~ $(BIN) $(CMX) $(GEN)
+	@echo "$(OK_COLOR)Done.$(NO_COLOR)"
+
+.depend: $(GEN)
+	rm -f .depend
+	ocamldep *.mli *.ml > .depend
+
+ifneq ($(MAKECMDGOALS),clean)
+include .depend
+endif
 

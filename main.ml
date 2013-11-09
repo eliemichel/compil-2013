@@ -1,26 +1,26 @@
 
 
 let () = 
-	let rec print_lexbuf token lexbuf =
+	(*let rec print_lexbuf token lexbuf =
 		try
 			print_string (Parser.string_of_token (token lexbuf));
 			print_string "\n";
 			print_lexbuf token lexbuf
 		with Lexer.Lexing_done -> print_string "EOF\n"
-	in
+	in*)
 
 
 	let f = open_in "tests/syntax/bad/testfile-illegal_char-2.cpp" in
 	let buf = Lexing.from_channel f in
 
-
-	try
-		print_string "Printing...\n";
-		print_lexbuf Lexer.token buf;
-		print_string "done.\n"
-	
-	with Lexer.Lexing_error err -> print_string ("Lexing error : " ^ err ^ "\n");
-
+	let _ =
+		try
+			Parser.program Lexer.token buf
+		with Lexer.Lexing_error err -> (
+			Printf.eprintf "Lexing error: %s\n" err;
+			exit 1
+			)
+	in
 
 	exit 0
 

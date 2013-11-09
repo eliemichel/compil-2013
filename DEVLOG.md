@@ -22,5 +22,14 @@ Format errors for emacs
 
 
 
+## 27/10/2013 (Day 2)
+### News
+Le projet utilise désormais Git
+Le Makefile a été refait (enfin copié sur celui de sysdig)
+Début du parser
+Ajout de lexemes oubliés
+
+Parser écrit, ainsi que les types de l'arbre de syntaxe abstraite, mais il reste
+des conflits à régler
 
 

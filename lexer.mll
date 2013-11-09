@@ -66,8 +66,8 @@ rule token = parse
 	| '"' (caractere* as s) '"' { STRING s }
 	| '{'    { LBRACE }
 	| '}'    { RBRACE }
-	| '('    { LPAREN }
-	| ')'    { RPAREN }
+	| '('    { LPAR }
+	| ')'    { RPAR }
 	| '='    { EQ }
 	| "||"   { OR }
 	| "&&"   { AND }
@@ -89,13 +89,14 @@ rule token = parse
 	| "->"   { ARROW }
 	| '.'    { DOT }
 	| ';'    { SEMCOL }
+	| ':'    { COL }
 	| ','    { COMMA }
 	| "#include <iostream>" { IOSTREAM }
 	| "std::cout"           { COUT }
 	| "<<"   { FLOW }
 	| "/*"   { comment lexbuf }
 	| commentaire_simple { token lexbuf }
-	| eof    { raise Lexing_done }
+	| eof    { EOF }
 	| _ as c { raise (Lexing_error ("Caractère inattendu : " ^ String.make 1 c)) }
 
 and comment = parse
@@ -117,7 +118,7 @@ let argument = type_ var
 let proto = (type_ qvar | tindent | tident "::" tident) argument (',' argument)*
 
 let member = decl_vars | "virtual"? proto
-let supers = ':' "public" tident (',' "public" tident)
+let supers = ':' "public" tident (',' "public" tident)*
 let decl_class = "class" ident supers? "{ public :" member* "};"
 
 let qident = ident | tident "::" ident
