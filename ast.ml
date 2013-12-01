@@ -1,11 +1,6 @@
 
 
-type ast =
-	| AST
-	| Prog of prog
-
-
-and prog = {
+type ast = {
 		decls    : decl list;
 		iostream : bool
 	}
@@ -24,7 +19,7 @@ and var =
 
 
 and qvar =
-	| Ident_in_qvar  of string
+	| QIdent_in_qvar of qident
 	| QPointer_value of qvar
 	| QAddress       of qvar
 
@@ -81,6 +76,7 @@ and instruction =
 and expr_flow =
 	| Expression_in_flow of expression
 	| String_in_flow     of string
+	| Endl
 
 
 and var_val =
@@ -90,8 +86,6 @@ and var_val =
 
 and expression =
 	| This
-	| True
-	| False
 	| Null
 	| Integer     of string
 	| QIdent      of qident
@@ -137,7 +131,9 @@ and binop =
 	| Or
 
 
+(* ------ *)
 
+let tidentTbl : (string, unit) Hashtbl.t = Hashtbl.create 17
 
 
 

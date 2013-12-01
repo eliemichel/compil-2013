@@ -6,14 +6,23 @@
 %token PUBLIC RETURN THIS TRUE VIRTUAL VOID WHILE
 %token LBRACE RBRACE LPAR RPAR EQ OR AND DBLEQ NEQ LT
 %token LEQ GT GEQ PLUS MINUS STAR DIV MOD NOT INCR DECR AMP
-%token ARROW DOT SEMCOL COL COMMA IOSTREAM COUT FLOW
+%token ARROW DOT SEMCOL COL COMMA IOSTREAM COUT ENDL FLOW
 %token EOF
-%token <string> IDENT INTEGER STRING
+%token <string> IDENT TIDENT INTEGER STRING
 
+%right EQ
+%left OR
+%left AND
+%left NEQ DBLEQ
+%left LT LEQ GT GEQ
+%left PLUS MINUS
+%left STAR DIV MOD
+%right NOT INCR DECR AMP
+%left DOT ARROW LPAR
 
-%nonassoc NEQ LT LEQ GT GEQ EQ DBLEQ LPAR
-%left PLUS MINUS DIV MOD OR AND DOT ARROW
-%left STAR INCR DECR
+%nonassoc IFX
+%nonassoc ELSE
+
 
 %start <Ast.ast> program
 
@@ -23,29 +32,30 @@ program:
 	io = IOSTREAM?
 	decls = decl*
 	EOF
-	{ Prog {
+	{{
 		decls = decls;
 		iostream = io <> None
 	}}
+
 
 decl:
 	| d = decl_vars        { Decl_vars  d      }
 	| d = decl_class       { Decl_class d      }
 	| p = proto b = bloc   { Proto_bloc (p, b) }
 
-decl_vars:
-	t = type_ v = var l = more_vars* SEMCOL { (t, v :: l) }
 
-more_vars:
-	COMMA v = var { v }
+decl_vars:
+	t = type_ l = separated_nonempty_list(COMMA, var) SEMCOL { (t, l) }
+
 
 var:
 	| id = IDENT    { Ident          id }
 	| STAR v = var  { Pointer_value   v }
 	| AMP  v = var  { Address         v }
 
+
 qvar:
-	| id = IDENT     { Ident_in_qvar   id }
+	| id = qident    { QIdent_in_qvar  id }
 	| STAR v = qvar  { QPointer_value   v }
 	| AMP  v = qvar  { QAddress         v }
 
@@ -53,12 +63,11 @@ qvar:
 type_:
 	|      VOID   { Void      }
 	|      INT    { Int       }
-	| id = IDENT  { TIdent id }
+	| id = TIDENT { TIdent id }
 
 
 decl_class:
-	CLASS
-	id = IDENT
+	id = start_class
 	s = supers?
 	LBRACE PUBLIC COL m = member* RBRACE SEMCOL
 	{
@@ -73,41 +82,48 @@ decl_class:
 	}
 
 
-supers:
-	COL PUBLIC id = IDENT l = more_supers* { id :: l }
+start_class:
+	CLASS
+	id = IDENT
+	{
+		if Hashtbl.mem tidentTbl id
+		then raise Error
+		else Hashtbl.add tidentTbl id ();
+		id
+	}
 
-more_supers:
-	COMMA PUBLIC id = IDENT                { id }
+
+supers:
+	COL l = separated_nonempty_list(COMMA, preceded (PUBLIC, TIDENT)) { l }
+
 
 member:
-	| d = decl_vars          { Decl_vars_in_member d }
-	| v = VIRTUAL? p = proto { if v = None then Proto p else Virtual_proto p }
+	| d = decl_vars          { Decl_vars_in_member d                         }
+	| v = ioption(VIRTUAL) p = proto SEMCOL
+	                         { if v = None then Proto p else Virtual_proto p }
+
 
 proto:
 	start = start_proto
-	arg = argument larg = more_arguments*
+	LPAR args = separated_list(COMMA, argument) RPAR
 	{{
 		start = start;
-		args  = arg :: larg
+		args  = args
 	}}
 
-more_arguments:
-	COMMA arg = argument   { arg }
 
 argument:
 	t = type_ v = var      { (t, v) }
 
 
 start_proto:
-	| t = type_ v = qvar             { Typed       (t, v)   }
-	| id = IDENT                     { Constructor id       }
-	| ns = IDENT COL COL id = IDENT  { Method      (ns, id) }
-
+	| t = type_ v = qvar              { Typed       (t, v)   }
+	| id = TIDENT                     { Constructor id       }
+	| ns = TIDENT COL COL id = TIDENT { Method      (ns, id) }
 
 
 bloc:
 	LBRACE l = instruction* RBRACE   { l }
-
 
 
 instruction:
@@ -115,7 +131,7 @@ instruction:
 	| e = expr SEMCOL               { Expression e }
 	| t = type_ var = var value = var_val? SEMCOL
 	                                { Var_init (t, var, value) }
-	| IF LPAR e = expr RPAR instr = instruction
+	| IF LPAR e = expr RPAR instr = instruction                        %prec IFX
 	                                { If (e, instr)              }
 	| IF LPAR e = expr RPAR instr = instruction ELSE instr2 = instruction
 	                                { If_else (e, instr, instr2) }
@@ -123,70 +139,68 @@ instruction:
 	                                { While (e, instr)           }
 	| FOR
 		LPAR
-			i = expr li = more_expr* SEMCOL
+			li = separated_list(COMMA, expr) SEMCOL
 			e = expr? SEMCOL
-			a = expr la = more_expr*
+			la = separated_list(COMMA, expr)
 		RPAR instr = instruction
 		{
 			let e = match e with
 				| None   -> True
 				| Some c -> c
 			in
-			For (i :: li, e, a :: la, instr)
+			For (li, e, la, instr)
 		}
 	| b = bloc                      { Bloc b   }
-	| COUT l = flow_expr+ SEMCOL    { Cout l   }
+	| COUT FLOW l = separated_nonempty_list(FLOW, expr_flow) SEMCOL
+	                                { Cout l   }
 	| RETURN e = expr? SEMCOL       { Return e }
 
 
-more_expr:
-	COMMA e = expr { e }
-
-flow_expr:
-	FLOW e = expr_str { e }
-
-expr_str:
+expr_flow:
 	| e = expr   { Expression_in_flow e }
 	| s = STRING { String_in_flow     s }
+	| ENDL       { Endl                 }
+
 
 var_val:
-	| EQ e = expr   { Value e                }
-	| EQ id = IDENT LPAR e = expr le = more_expr* RPAR
-	                { Returned (id, e :: le) }
+	| EQ e = expr   { Value e           }
+	| EQ id = TIDENT LPAR le = separated_list(COMMA, expr) RPAR
+	                { Returned (id, le) }
 
 
 expr:
 	| THIS                                         { This                     }
-	| TRUE                                         { True                     }
-	| FALSE                                        { False                    }
+	| TRUE                                         { Integer 1                }
+	| FALSE                                        { Integer 0                }
 	| NULL                                         { Null                     }
 	| n = INTEGER                                  { Integer n                }
 	| id = qident                                  { QIdent id                }
-	| e = expr DOT   id = IDENT                    { Dot   (e, id)            }
-	| e = expr ARROW id = IDENT                    { Arrow (e, id)            }
+	| e = expr DOT   id = IDENT                    { Dot (e, id)              }
+	| e = expr ARROW id = IDENT                    { Dot (Unop (Star, e), id) }
 	| e1 = expr EQ e2 = expr                       { Eq    (e1, e2)           }
-	| f = expr LPAR e = expr le = more_expr* RPAR  { Application (f, e :: le) }
-	| NEW id = IDENT e = expr le = more_expr*      { New  (id, e :: le)       }
+	| f = expr LPAR le = separated_list(COMMA, expr) RPAR
+	                                               { Application (f, le)      }
+	| NEW id = TIDENT LPAR le = separated_list(COMMA, expr) RPAR
+	                                               { New  (id, le)            }
 	| INCR e = expr                                { Unop (IncrLeft,  e)      }
 	| DECR e = expr                                { Unop (DecrLeft,  e)      }
 	| e = expr INCR                                { Unop (IncrRight, e)      }
 	| e = expr DECR                                { Unop (DecrRight, e)      }
-	| AMP e = expr                                 { Unop (Amp,       e)      }
-	| NOT e = expr                                 { Unop (Not,       e)      }
+	| AMP   e = expr                               { Unop (Amp,       e)      }
+	| NOT   e = expr                               { Unop (Not,       e)      }
 	| MINUS e = expr                               { Unop (Minus,     e)      }
-	| PLUS e = expr                                { Unop (Plus,      e)      }
-	| STAR e = expr                                { Unop (Star,      e)      }
+	| PLUS  e = expr                               { Unop (Plus,      e)      }
+	| STAR  e = expr                               { Unop (Star,      e)      }
 	| e1 = expr op = operateur e2 = expr           { Binop (op, e1, e2)       }
 	| LPAR e = expr RPAR                           { e                        }
 
 
-
 qident:
-	| id = IDENT                    { Simple_qident    id       }
-	| ns = IDENT COL COL id = IDENT { Namespace_qident (ns, id) }
+	| id = IDENT                     { Simple_qident    id       }
+	| ns = TIDENT COL COL id = IDENT { Namespace_qident (ns, id) }
 
 
-operateur:
+%inline operateur:
 	| DBLEQ { Dbleq }
 	| NEQ   { Neq   }
 	| LT    { Lt    }
@@ -200,5 +214,6 @@ operateur:
 	| MOD   { Mod   }
 	| AND   { And   }
 	| OR    { Or    }
+
 
 

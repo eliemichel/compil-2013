@@ -32,4 +32,19 @@ Ajout de lexemes oubliés
 Parser écrit, ainsi que les types de l'arbre de syntaxe abstraite, mais il reste
 des conflits à régler
 
+## 19/11/2013
+« IF (expr) IF (expr) instr ELSE instr » est ambigu.
+différencier proto et decl_vars
+Parser fonctionnel, reste à gérer l'affichage des erreurs
+
+## 24/11/2013
+Messages d'erreur formatés
+Paramètre --parse-only ajouté
+Ajouter la position dans l'ast
+
+AST est un .ml pour pouvoir y définir la table de lexing hack
+Caractère DEL
+
+
+
 

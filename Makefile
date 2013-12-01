@@ -11,8 +11,8 @@ WARN_COLOR=\033[33;01m
 HIGHLIGHT_COLOR=\033[1m
 
 all: $(BIN)
-	@echo "$(HIGHLIGHT_COLOR)  ./$(BIN)$(NO_COLOR)"
-	@./$(BIN)
+	@echo "$(HIGHLIGHT_COLOR)  ./$(BIN) --help$(NO_COLOR)"
+	@./$(BIN) --help
 
 
 $(BIN): $(CMX)
