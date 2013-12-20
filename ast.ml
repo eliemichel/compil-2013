@@ -1,6 +1,13 @@
 
+(* ------ Parsed AST ------ *)
 
-type ast = {
+type 'a pos_node = {
+	node : 'a;
+	start_pos : Lexing.position;
+	end_pos : Lexing.position
+}
+
+type pAst = {
 		decls    : decl list;
 		iostream : bool
 	}
@@ -13,7 +20,7 @@ and decl =
 
 
 and var =
-	| Ident          of string
+	| Ident          of string pos_node
 	| Pointer_value  of var
 	| Address        of var
 
@@ -53,8 +60,8 @@ and argument = type_ * var
 
 
 and start_proto =
-	| Typed       of type_ * qvar
-	| Constructor of string
+	| Function    of type_ * qvar
+	| Constructor of string pos_node
 	| Method      of string * string
 
 
@@ -76,7 +83,6 @@ and instruction =
 and expr_flow =
 	| Expression_in_flow of expression
 	| String_in_flow     of string
-	| Endl
 
 
 and var_val =
@@ -84,7 +90,10 @@ and var_val =
 	| Returned of string * expression list
 
 
-and expression =
+and expression = expression_node pos_node
+
+
+and expression_node =
 	| This
 	| Null
 	| Integer     of string
@@ -111,8 +120,8 @@ and unop =
 
 
 and qident =
-	| Simple_qident    of string
-	| Namespace_qident of string * string
+	| Simple_qident    of string pos_node
+	| Namespace_qident of string pos_node * string pos_node
 
 
 and binop =
@@ -131,10 +140,42 @@ and binop =
 	| Or
 
 
-(* ------ *)
+(* ------ Function AST ------ *)
+
+module Env = Map.Make(String)
+
+type tAst = {
+	declarations : t_decl list;
+}
+
+
+and ty =
+	| TyTypeNull
+	| TyVoid
+	| TyInt
+	| TyClass of string
+	| TyPointer of ty
+	| TyFun of ty * ty list (* bonne idée ou pas ? *)
+
+
+and t_decl =
+	| T_decl_var of ty * string
+	| T_decl_fun of ty * string * t_instr list
+
+and t_instr =
+	| T_instr_cout_expr of t_expr
+	| T_instr_cout_str of string
+	| T_instr_return of int
+
+and t_expr =
+	ty
+
+(* ------ Lexer hack ------ *)
 
 let tidentTbl : (string, unit) Hashtbl.t = Hashtbl.create 17
 
 
+
+exception TODO
 
 

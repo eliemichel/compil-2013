@@ -48,3 +48,32 @@ Caractère DEL
 
 
 
+
+
+
+
+## 20/12/2013
+*Partie 2*
+
+J'ai tout d'abord pensé faire tout le typage puis toute la production de code,
+mais en faisant ça j'ai du mal à me rendre compte des meilleurs structures à
+utiliser. J'ai également pensé au début pouvoir ajouter les indications de
+position a posteriori, mais jhj me l'a déconseillé et en effet, il est
+intéressant d'ajouter ces annotations à l'arbre au fur et à mesure que l'on écrit
+les messages d'erreur. Cela permet d'annoter uniquement les nœuds qui le
+nécessitent et de visualiser la progression du typeur.
+
+J'ai finalement fait un premier brouillon (très moche sur la prod de code) d'une
+« tranche » du compilateur plutôt que de travailler par couche.
+
+Je ne sais pas encore si c'est une bonne idée, mais j'ai utilisé le même type
+pour le typage des expressions (NULL, Pointer, Int, Class) et pour les associations
+dans l'environnement (Function, HasAttr).
+
+Voir plus précisemment comment fonctionnent les références (en arguments, variable
+locale et retour de fonction).
+
+
+
+
+

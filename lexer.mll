@@ -105,7 +105,6 @@ rule token = parse
 	| ','    { COMMA }
 	| "#include <iostream>" { IOSTREAM }
 	| "std::cout"           { COUT }
-	| "std::endl"           { ENDL }
 	| "<<"   { FLOW }
 	| "/*"   { comment lexbuf }
 	| commentaire_simple { newline lexbuf ; token lexbuf }

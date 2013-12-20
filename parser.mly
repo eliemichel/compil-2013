@@ -6,7 +6,7 @@
 %token PUBLIC RETURN THIS TRUE VIRTUAL VOID WHILE
 %token LBRACE RBRACE LPAR RPAR EQ OR AND DBLEQ NEQ LT
 %token LEQ GT GEQ PLUS MINUS STAR DIV MOD NOT INCR DECR AMP
-%token ARROW DOT SEMCOL COL COMMA IOSTREAM COUT ENDL FLOW
+%token ARROW DOT SEMCOL COL COMMA IOSTREAM COUT FLOW
 %token EOF
 %token <string> IDENT TIDENT INTEGER STRING
 
@@ -24,9 +24,12 @@
 %nonassoc ELSE
 
 
-%start <Ast.ast> program
+%start <Ast.pAst> program
 
 %%
+
+position(X):
+	x = X { { node = x ; start_pos = $startpos ; end_pos = $endpos}}
 
 program:
 	io = IOSTREAM?
@@ -49,7 +52,7 @@ decl_vars:
 
 
 var:
-	| id = IDENT    { Ident          id }
+	| id = position(IDENT)    { Ident          id }
 	| STAR v = var  { Pointer_value   v }
 	| AMP  v = var  { Address         v }
 
@@ -117,8 +120,8 @@ argument:
 
 
 start_proto:
-	| t = type_ v = qvar              { Typed       (t, v)   }
-	| id = TIDENT                     { Constructor id       }
+	| t = type_ v = qvar              { Function    (t, v)   }
+	| id = position(TIDENT)           { Constructor id       }
 	| ns = TIDENT COL COL id = TIDENT { Method      (ns, id) }
 
 
@@ -145,7 +148,11 @@ instruction:
 		RPAR instr = instruction
 		{
 			let e = match e with
-				| None   -> True
+				| None   -> {
+					node = Integer "1";
+					start_pos = $startpos;
+					end_pos = $endpos
+					}
 				| Some c -> c
 			in
 			For (li, e, la, instr)
@@ -159,7 +166,6 @@ instruction:
 expr_flow:
 	| e = expr   { Expression_in_flow e }
 	| s = STRING { String_in_flow     s }
-	| ENDL       { Endl                 }
 
 
 var_val:
@@ -167,16 +173,27 @@ var_val:
 	| EQ id = TIDENT LPAR le = separated_list(COMMA, expr) RPAR
 	                { Returned (id, le) }
 
-
 expr:
+	e = position(expr_node) {e}
+
+expr_node:
 	| THIS                                         { This                     }
-	| TRUE                                         { Integer 1                }
-	| FALSE                                        { Integer 0                }
+	| TRUE                                         { Integer "1"              }
+	| FALSE                                        { Integer "0"              }
 	| NULL                                         { Null                     }
 	| n = INTEGER                                  { Integer n                }
 	| id = qident                                  { QIdent id                }
 	| e = expr DOT   id = IDENT                    { Dot (e, id)              }
-	| e = expr ARROW id = IDENT                    { Dot (Unop (Star, e), id) }
+	| e = expr ARROW id = IDENT                    {
+		Dot (
+			{
+				node = Unop (Star, e);
+				start_pos = $startpos;
+				end_pos = $endpos;
+			},
+			id
+			)
+	                                                                          }
 	| e1 = expr EQ e2 = expr                       { Eq    (e1, e2)           }
 	| f = expr LPAR le = separated_list(COMMA, expr) RPAR
 	                                               { Application (f, le)      }
@@ -192,12 +209,13 @@ expr:
 	| PLUS  e = expr                               { Unop (Plus,      e)      }
 	| STAR  e = expr                               { Unop (Star,      e)      }
 	| e1 = expr op = operateur e2 = expr           { Binop (op, e1, e2)       }
-	| LPAR e = expr RPAR                           { e                        }
+	| LPAR e = expr RPAR                           { e.node                   }
 
 
 qident:
-	| id = IDENT                     { Simple_qident    id       }
-	| ns = TIDENT COL COL id = IDENT { Namespace_qident (ns, id) }
+	| id = position(IDENT)      { Simple_qident    id       }
+	| ns = position(TIDENT) COL COL id = position(IDENT)
+	                            { Namespace_qident (ns, id) }
 
 
 %inline operateur:
