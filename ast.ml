@@ -143,7 +143,7 @@ and binop =
 
 type tAst = {
 	declarations : t_decl list;
-	globals      : (string, ty) Hashtbl.t
+	globals      : ty Env.Local.t
 }
 
 
@@ -157,7 +157,6 @@ and ty =
 
 
 and t_decl =
-	| Tvar of ty * string
 	| Tfun of ty * string * t_instr list
 
 and t_instr =
@@ -174,8 +173,7 @@ and t_expr =
 	| Tthis
 	| Tnull
 	| Tint of string
-	| Tglobal of string
-	| Tlocal  of string
+	| Tvar  of string
 	| Tassign of t_expr * t_expr
 	(*| Tunop of unop * t_expr*)
 	| Tbinop of t_binop * t_expr * t_expr
@@ -213,7 +211,7 @@ let size_of_ty = function
 	| TyInt       -> 4
 	| TyClass s   -> raise TODO
 	| TyPointer _ -> 4
-	| TyFun _     -> assert false
+	| TyFun _     -> 0
 
 
 

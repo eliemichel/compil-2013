@@ -146,12 +146,7 @@ let rec type_expr env e = match e.node with
 	| Null -> TyTypeNull, Tnull, false
 	| Integer     s -> TyInt, Tint s, false
 	| QIdent (Simple_qident s) ->
-		let n =
-			if Hashtbl.mem globals s.node
-			then Tglobal s.node
-			else Tlocal  s.node
-		in
-		(try Env.find s.node env, n, true
+		(try Env.find s.node env, Tvar s.node, true
 		with Not_found -> raise (Error (
 					("Undefined identifier '" ^ s.node ^ "'"),
 					s.start_pos,
@@ -208,7 +203,7 @@ let rec type_instr (env, instr) = function
 			| None -> instr
 			| Some (Value    e) ->
 				let _, e', _ = type_expr env e in
-					(Texpr (Tassign (Tlocal s.node, e'))) :: instr
+					(Texpr (Tassign (Tvar s.node, e'))) :: instr
 			| Some (Returned _) -> raise TODO
 		)
 	| If_else    (test, instr1, instr2)      ->
@@ -262,13 +257,13 @@ let type_decl (env, decls) = function
 
 
 let typing pAst =
-	let _, decls = List.fold_left
+	let env, decls = List.fold_left
 		type_decl
 		(Env.empty, [])
 		pAst.decls
 	in {
 		declarations = List.rev decls;
-		globals = globals
+		globals = Env.get_globals env
 	}
 
 

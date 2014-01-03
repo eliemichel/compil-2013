@@ -125,7 +125,7 @@ Problème avec ce genre de code :
 		std::cout << i; // Affiche '1' au lieu de '2'
 
 
-J'ai décidé d'abandonner la distinction variables globales / variables locales
+J'ai décidé d'abandonner la distinction variables globales / variables locales.
 
 
 

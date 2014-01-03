@@ -1,13 +1,10 @@
 open Ast
 open Mips
 
-let globals = ref (Hashtbl.create 0)
-
 let data_i = ref 0
-let rec get_new_label () =
+let get_new_label () =
 	let s = "data_" ^ (string_of_int !data_i) in
-	incr data_i;
-	if Hashtbl.mem !globals s then get_new_label () else s
+	incr data_i; s
 
 let cont_i = ref 0
 let get_new_control () =
@@ -15,7 +12,7 @@ let get_new_control () =
 	incr cont_i; s
 
 let data = ref []
-let env = ref Env.empty
+let global_env = ref Env.empty
 
 let push n = mips [ Arith (Mips.Sub, SP, SP, Oimm n) ]
 let pop n = mips [ Arith (Mips.Add, SP, SP, Oimm n) ]
@@ -43,23 +40,33 @@ let set_of_binop = function
 
 
 let make_addr_env env =
-	let c = ref 0 in
-	let aux t =
-		let c' = !c in
-			c := !c + size_of_ty t;
-			c'
+	let aux k t (addr_env, c) =
+		let size = size_of_ty t in
+			Env.Local.add k c addr_env,
+			c + size
 	in
-		Env.Local.map aux env, !c
+		Env.Local.fold aux env (Env.Local.empty, 0)
+
+let malloc env =
+	let addr_env, n = make_addr_env env in
+		global_env := Env.push addr_env !global_env;
+		push_r FP ++
+		mips [ Move (FP, SP) ] ++
+		push n
+
+let free () =
+	global_env := snd (Env.pop !global_env);
+		mips [ Move (SP, FP) ] ++
+		pop_r FP
 
 let rec search_locals = function
 	| 0 -> nop
-	| i -> mips [ Lw (FP, Areg (0, FP)) ] ++ search_locals (i - 1)
+	| i -> mips [ Lw (FP, Areg (4, FP)) ] ++ search_locals (i - 1)
 
 let rec compile_expr_g = function
 	| Tthis | Tnull | Tint _ | Tassign _ | Tbinop  _ -> assert false
-	| Tglobal s -> mips [ La (A0, s) ] ++ push_r A0
-	| Tlocal  s ->
-		let addr, iter = Env.find_and_localize s !env in
+	| Tvar  s ->
+		let addr, iter = Env.find_and_localize s !global_env in
 			push_r FP ++
 			search_locals iter ++
 			mips [ Arith (Mips.Sub, A0, FP, Oimm addr) ] ++
@@ -67,12 +74,11 @@ let rec compile_expr_g = function
 			push_r A0
 
 let rec compile_expr = function
-	| Tthis     -> raise TODO
-	| Tnull     -> mips [ Li (A0, "0") ] ++ push_r A0
-	| Tint i    -> mips [ Li (A0,  i ) ] ++ push_r A0
-	| Tglobal s -> mips [ Lw (A0, Alab s) ] ++ push_r A0
-	| Tlocal  s ->
-		let addr, iter = Env.find_and_localize s !env in
+	| Tthis  -> raise TODO
+	| Tnull  -> mips [ Li (A0, "0") ] ++ push_r A0
+	| Tint i -> mips [ Li (A0,  i ) ] ++ push_r A0
+	| Tvar s ->
+		let addr, iter = Env.find_and_localize s !global_env in
 			push_r FP ++
 			search_locals iter ++
 			mips [ Lw (A0, Areg (-addr, FP)) ] ++
@@ -144,36 +150,24 @@ and compile_instr = function
 		mips [ Li (V0, "1") ; Syscall ]
 	| Treturn    i ->
 		mips [ Li (V0, "10") ; Syscall ]
-	| Tmalloc  local_env ->
-		let addr_env, n = make_addr_env local_env in
-			env := Env.push addr_env !env;
-			push_r FP ++
-			mips [ Move (FP, SP) ] ++
-			push n
-	| Tfree ->
-		env := snd (Env.pop !env);
-		mips [ Move (SP, FP) ] ++
-		pop_r FP
+	| Tmalloc env  -> malloc env
+	| Tfree        -> free ()
 
 
 let compile_decl = function
-	| Tvar (t, s) -> raise TODO
 	| Tfun (t, s, instrs) ->
 		mips [ Label s ] ++
 		compile_instrs instrs
 
 let compile tAst =
-	globals := tAst.globals;
+	let pre = malloc tAst.globals in
 	let code = List.map compile_decl tAst.declarations in
 	let code = List.fold_right (++) code nop in
-	
-	let data =
-		Hashtbl.fold (fun x _ l -> Word (x, [Wint 1]) :: l) !globals !data
-	in
+	let post = free () in
 	
 	{
-		text = code;
-		data = data
+		text = pre ++ code ++ post;
+		data = !data
 	}
 
 

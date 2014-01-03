@@ -25,6 +25,12 @@ let add key v = function
 		let local' = Local.add key v local in
 			EnvBloc (local', parent)
 
+let rec get_globals = function
+	| EnvRoot -> raise Empty_env
+	| EnvBloc (local, parent) ->
+		try get_globals parent
+		with Empty_env -> local
+
 let rec mem key = function
 	| EnvRoot -> false
 	| EnvBloc (local, parent) ->
