@@ -140,25 +140,6 @@ and binop =
 
 (* ------ Function AST ------ *)
 
-module LocalEnv = Map.Make(String)
-
-type 'a environment = EnvRoot | EnvBloc of 'a Env.t * environment
-
-module Env = struct
-	let empty = EnvRoot
-	
-	let rec find_and_localize key = function
-		| EnvRoot -> raise Not_found
-		| EnvBloc (local, parent) ->
-			try LocalEnv.find key local, 0
-			with Not_found ->
-				let v, n = find key parent in v, n + 1
-	
-	let find key env =
-		let v, n = find_and_localize key env in v
-	
-	
-end
 
 type tAst = {
 	declarations : t_decl list;
@@ -186,7 +167,7 @@ and t_instr =
 	| Tcout_expr of t_expr
 	| Tcout_str of string
 	| Treturn of int
-	| Tmalloc of ty Env.t
+	| Tmalloc of ty Env.Local.t
 	| Tfree
 
 and t_expr =

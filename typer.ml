@@ -66,7 +66,7 @@ let rec decl_function_extract_name t = function
 
 
 let decl_var env t s =
-	if Env.mem s.node env
+	if Env.mem_local s.node env
 	then raise (Error (
 		("This variable has already been declared : " ^ s.node),
 		s.start_pos,
@@ -76,20 +76,20 @@ let decl_var env t s =
 		Env.add s.node t env
 	)
 
-let type_decl_var glob env t v =
+let decl_glob_var env t v =
 	let t, s = decl_var_extract_name t v in
 		Hashtbl.add globals s.node t;
 		decl_var env t s
 
 let type_proto env proto =
-	let args, argst, env' = List.fold_left (* /!\ List.rev *)
+	let args, argst, local_env' = List.fold_left (* /!\ List.rev *)
 		(fun (l, lt, c) (t, v) ->
 			let t, s = decl_var_extract_name t v in
 				(t, s) :: l,
 				t :: lt,
-				Env.add s.node t c
+				Env.Local.add s.node t c
 		)
-		([], [], env)
+		([], [], Env.Local.empty)
 		proto.args
 	in
 	match proto.start with
@@ -97,14 +97,14 @@ let type_proto env proto =
 			let t, s = decl_function_extract_name t qvar in
 			let t = TyFun (t, argst) in
 				let env = decl_var env t s in
-				let env' = decl_var env' t s in
+				let env' = Env.push local_env' env in
 					env, env', t, s
 		| Constructor s   -> raise (Error (
 			("Constructor of " ^ s.node ^ " out of class declaration"),
 			s.start_pos,
 			s.end_pos
 			))
-		| Method (s1, s2) -> ignore (s1, s2) ; raise TODO
+		| Method (s1, s2) -> raise TODO
 
 let rec num = function
 	| TyTypeNull | TyInt | TyPointer _ -> true
@@ -234,9 +234,11 @@ let rec type_instr (env, instr) = function
 		let _, t_corps = type_instr (env, []) (Bloc [corps]) in
 			env, (Tfor (t_before, t_test, t_iter, List.rev t_corps)) :: instr
 	| Bloc       bloc                        ->
-		let env', instr' = List.fold_left type_instr (env, []) bloc in
-		let local_env = Env.filter (fun v _ -> not (Env.mem v env)) env' in
-			if Env.is_empty local_env
+		let env', instr' =
+			List.fold_left type_instr (Env.push_empty env, []) bloc
+		in
+		let local_env, _ = Env.pop env' in
+			if Env.Local.is_empty local_env
 			then env, instr' @ instr
 			else env, Tfree :: instr' @ ((Tmalloc local_env) :: instr)
 	| Cout       expr_list                   ->
@@ -247,7 +249,7 @@ let rec type_instr (env, instr) = function
 let type_decl (env, decls) = function
 	| Decl_vars  (t, vars) ->
 		List.fold_left
-			(fun env v -> type_decl_var true env t v)
+			(fun env v -> decl_glob_var env t v)
 			env
 			vars,
 		decls

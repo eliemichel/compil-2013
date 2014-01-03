@@ -15,7 +15,7 @@ let get_new_control () =
 	incr cont_i; s
 
 let data = ref []
-let env = ref EnvRoot
+let env = ref Env.empty
 
 let push n = mips [ Arith (Mips.Sub, SP, SP, Oimm n) ]
 let pop n = mips [ Arith (Mips.Add, SP, SP, Oimm n) ]
@@ -42,17 +42,14 @@ let set_of_binop = function
 
 
 
-let rec find_addr s = function
-	| EnvRoot -> raise Not_found
-	| EnvBloc (env, parent) ->
-		try Env.find s env, 0
-		with Not_found ->
-			let addr, iter = find_addr s parent in
-				addr, iter + 1
-
 let make_addr_env env =
 	let c = ref 0 in
-		Env.map (fun t -> let c' = !c in c := !c + size_of_ty t; c') env, !c
+	let aux t =
+		let c' = !c in
+			c := !c + size_of_ty t;
+			c'
+	in
+		Env.Local.map aux env, !c
 
 let rec search_locals = function
 	| 0 -> nop
@@ -62,7 +59,7 @@ let rec compile_expr_g = function
 	| Tthis | Tnull | Tint _ | Tassign _ | Tbinop  _ -> assert false
 	| Tglobal s -> mips [ La (A0, s) ] ++ push_r A0
 	| Tlocal  s ->
-		let addr, iter = find_addr s !env in
+		let addr, iter = Env.find_and_localize s !env in
 			push_r FP ++
 			search_locals iter ++
 			mips [ Arith (Mips.Sub, A0, FP, Oimm addr) ] ++
@@ -75,7 +72,7 @@ let rec compile_expr = function
 	| Tint i    -> mips [ Li (A0,  i ) ] ++ push_r A0
 	| Tglobal s -> mips [ Lw (A0, Alab s) ] ++ push_r A0
 	| Tlocal  s ->
-		let addr, iter = find_addr s !env in
+		let addr, iter = Env.find_and_localize s !env in
 			push_r FP ++
 			search_locals iter ++
 			mips [ Lw (A0, Areg (-addr, FP)) ] ++
@@ -83,7 +80,7 @@ let rec compile_expr = function
 			push_r A0
 	| Tassign (e1, e2) ->
 		compile_expr_g e1 ++
-		compile_expr e2 ++
+		compile_expr   e2 ++
 		pop_r A0 ++
 		pop_r A1 ++
 		mips [ Sw (A0, Areg (0, A1)) ] ++
@@ -149,15 +146,12 @@ and compile_instr = function
 		mips [ Li (V0, "10") ; Syscall ]
 	| Tmalloc  local_env ->
 		let addr_env, n = make_addr_env local_env in
-			env := EnvBloc (addr_env, !env);
+			env := Env.push addr_env !env;
 			push_r FP ++
 			mips [ Move (FP, SP) ] ++
 			push n
 	| Tfree ->
-		env := (match !env with
-			| EnvRoot -> assert false
-			| EnvBloc (_, parent) -> parent
-		);
+		env := snd (Env.pop !env);
 		mips [ Move (SP, FP) ] ++
 		pop_r FP
 

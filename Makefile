@@ -1,4 +1,4 @@
-CMX=ast.cmx mips.cmx parser.cmx lexer.cmx typer.cmx prod.cmx main.cmx
+CMX=env.cmx ast.cmx mips.cmx parser.cmx lexer.cmx typer.cmx prod.cmx main.cmx
 GEN=lexer.ml parser.ml parser.mli
 BIN=minic++
 LIBS=

@@ -1,6 +1,6 @@
 // ./minic++ test.cpp 1> /tmp/mips1.s && echo "-=-=-=-=-" && cat /tmp/mips1.s && echo "-=-=-=-=-" && mars /tmp/mips1.s
 
-int i, **j;
+int i, j;
 
 int main(int argn, int **arv) {
 	std::cout << "\nThe answer " << "is ";
@@ -12,14 +12,24 @@ int main(int argn, int **arv) {
 	else
 		std::cout << " i est positif ";
 	
+	int k = 5;
+	if (true) {
+		k = 2;
+		std::cout << "| k = " << k << " ";
+		int k = 10;
+		std::cout << "| k = " << k << " ";
+	}
+	std::cout << "| k = " << k << " ";
+	
 	i = 0;
 	while (i < 10) {
 		std::cout << " i = " << i << "   ";
 		i = i + 1;
 	}
 	
-	int k = 4;
-	std::cout << "| k = " << k + 5;
+	
+	int j = 4;
+	std::cout << "| j = " << j;
 	
 	return 0;
 }
