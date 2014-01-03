@@ -72,9 +72,7 @@ and instruction =
 	| Empty
 	| Expression of expression
 	| Var_init   of type_ * var * var_val option
-	| If         of expression * instruction
 	| If_else    of expression * instruction * instruction
-	| While      of expression * instruction
 	| For        of expression list * expression * expression list * instruction
 	| Bloc       of bloc
 	| Cout       of expr_flow list
@@ -142,10 +140,29 @@ and binop =
 
 (* ------ Function AST ------ *)
 
-module Env = Map.Make(String)
+module LocalEnv = Map.Make(String)
+
+type 'a environment = EnvRoot | EnvBloc of 'a Env.t * environment
+
+module Env = struct
+	let empty = EnvRoot
+	
+	let rec find_and_localize key = function
+		| EnvRoot -> raise Not_found
+		| EnvBloc (local, parent) ->
+			try LocalEnv.find key local, 0
+			with Not_found ->
+				let v, n = find key parent in v, n + 1
+	
+	let find key env =
+		let v, n = find_and_localize key env in v
+	
+	
+end
 
 type tAst = {
 	declarations : t_decl list;
+	globals      : (string, ty) Hashtbl.t
 }
 
 
@@ -159,23 +176,63 @@ and ty =
 
 
 and t_decl =
-	| T_decl_var of ty * string
-	| T_decl_fun of ty * string * t_instr list
+	| Tvar of ty * string
+	| Tfun of ty * string * t_instr list
 
 and t_instr =
-	| T_instr_cout_expr of t_expr
-	| T_instr_cout_str of string
-	| T_instr_return of int
+	| Texpr of t_expr
+	| Tifelse of t_expr * t_instr list * t_instr list
+	| Tfor of t_expr list * t_expr * t_expr list * t_instr list
+	| Tcout_expr of t_expr
+	| Tcout_str of string
+	| Treturn of int
+	| Tmalloc of ty Env.t
+	| Tfree
 
 and t_expr =
-	ty
+	| Tthis
+	| Tnull
+	| Tint of string
+	| Tglobal of string
+	| Tlocal  of string
+	| Tassign of t_expr * t_expr
+	(*| Tunop of unop * t_expr*)
+	| Tbinop of t_binop * t_expr * t_expr
 
-(* ------ Lexer hack ------ *)
+and t_binop =
+	| Tarith of t_binop_arith
+	| Tset   of t_binop_set
 
+and t_binop_arith =
+	| Tadd
+	| Tsub
+	| Tmult
+	| Tdiv
+	| Tmod
+	| Tand
+	| Tor
+
+and t_binop_set =
+	| Teq
+	| Tneq
+	| Tlt
+	| Tleq
+	| Tgt
+	| Tgeq
+
+(* Lexer hack *)
 let tidentTbl : (string, unit) Hashtbl.t = Hashtbl.create 17
 
 
-
 exception TODO
+
+let size_of_ty = function
+	| TyTypeNull  -> 0
+	| TyVoid      -> 0
+	| TyInt       -> 4
+	| TyClass s   -> raise TODO
+	| TyPointer _ -> 4
+	| TyFun _     -> assert false
+
 
 

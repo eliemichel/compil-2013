@@ -135,11 +135,11 @@ instruction:
 	| t = type_ var = var value = var_val? SEMCOL
 	                                { Var_init (t, var, value) }
 	| IF LPAR e = expr RPAR instr = instruction                        %prec IFX
-	                                { If (e, instr)              }
+	                                { If_else (e, instr, Empty)  }
 	| IF LPAR e = expr RPAR instr = instruction ELSE instr2 = instruction
 	                                { If_else (e, instr, instr2) }
 	| WHILE LPAR e = expr RPAR instr = instruction
-	                                { While (e, instr)           }
+	                                { For ([], e, [], instr)     }
 	| FOR
 		LPAR
 			li = separated_list(COMMA, expr) SEMCOL
@@ -155,7 +155,7 @@ instruction:
 					}
 				| Some c -> c
 			in
-			For (li, e, la, instr)
+				For (li, e, la, instr)
 		}
 	| b = bloc                      { Bloc b   }
 	| COUT FLOW l = separated_nonempty_list(FLOW, expr_flow) SEMCOL

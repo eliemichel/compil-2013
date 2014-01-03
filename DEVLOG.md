@@ -73,7 +73,47 @@ dans l'environnement (Function, HasAttr).
 Voir plus précisemment comment fonctionnent les références (en arguments, variable
 locale et retour de fonction).
 
+Considérer un langage avec uniquement :
 
+ * fonctions
+ * additions
+ * cout
+ * variables
+
+
+## 31/12/2013
+
+J'ai récupéré le fichier mips.ml du td arithc pour simplifier la production de code.
+Commencer par imprimer du texte n'est pas forécment la meilleure idée. Les entiers
+auraient été un meilleur début pour pouvoir se consacrer directement à la compilation
+des expressions sans perdre de temps à discerner les cas où l'on imprime du texte
+de ceux où l'on imprime des nombres.
+
+`Li` est modifié afin de prendre comme paramètre une chaîne et non un entier (pour
+des questions de capacité)
+
+J'ai maintenant un langage qui peut afficher des chaînes et le résultat d'opérations
+binaires.
+
+Ajoutons les variables… On commence par les globales. -> OK pour lecture et écriture
+
+Les chaînes de caractères n'acceptent pas de caractères accentués mais l'erreur qui
+en résulte est assez obscure.
+
+## 01/01/2014
+
+Gestion des boucles terminée. Il va falloir faire les blocs sinon l'intérêt des
+boucles est limité. Le `while` a été « sucre syntaxiquisé » en `for (;test;)`.
+
+Ajoutons maintenant les variables locales. Il faut les empiler à chaque fois qu'un
+environnement est oublié.
+
+Ça marche !
+
+## 03/01/2014
+
+Il faut régler les problèmes de conflits dans la déclaration des variables dans
+le typeur.
 
 
 

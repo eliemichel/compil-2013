@@ -60,7 +60,7 @@ let main filename =
 	in
 	if !type_only then exit 0
 	else
-		Printf.printf "%s" (Prod.compile tAst);
+		Format.printf "%a" Mips.print_program (Prod.compile tAst);
 		exit 0
 
 let () = Arg.parse
