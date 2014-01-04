@@ -133,7 +133,7 @@ instruction:
 	| SEMCOL                        { Empty        }
 	| e = expr SEMCOL               { Expression e }
 	| t = type_ var = var value = var_val? SEMCOL
-	                                { Var_init (t, var, value) }
+	                                { Var_init (t, var, value)   }
 	| IF LPAR e = expr RPAR instr = instruction                        %prec IFX
 	                                { If_else (e, instr, Empty)  }
 	| IF LPAR e = expr RPAR instr = instruction ELSE instr2 = instruction

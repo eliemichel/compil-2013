@@ -12,9 +12,13 @@ let rec string_of_ty = function
 	| TyInt            -> "TyInt"
 	| TyClass s        -> "TyClass " ^ s
 	| TyPointer t      -> "TyPointer " ^ (string_of_ty t)
-	| TyFun (rt, argt) ->
+	| TyFun (rt, argt, argenv) ->
 		"TyFun : " ^
-		(List.fold_left (fun s t -> s ^ ", " ^ (string_of_ty t)) "" argt) ^
+		(List.fold_left
+			(fun s t -> s ^ ", " ^ (string_of_ty (Env.Local.find s argenv)))
+			""
+			argt
+		) ^
 		" -> " ^
 		(string_of_ty rt)
 
@@ -82,23 +86,21 @@ let decl_glob_var env t v =
 		decl_var env t s
 
 let type_proto env proto =
-	let args, argst, local_env' = List.fold_left (* /!\ List.rev *)
-		(fun (l, lt, c) (t, v) ->
+	let args, local_env = List.fold_left (* /!\ List.rev *)
+		(fun (l, loc) (t, v) ->
 			let t, s = decl_var_extract_name t v in
-				(t, s) :: l,
-				t :: lt,
-				Env.Local.add s.node t c
+				s.node :: l,
+				Env.Local.add s.node t loc
 		)
-		([], [], Env.Local.empty)
+		([], Env.Local.empty)
 		proto.args
 	in
 	match proto.start with
 		| Function (t, qvar) ->
 			let t, s = decl_function_extract_name t qvar in
-			let t = TyFun (t, argst) in
+			let t = TyFun (t, args, local_env) in
 				let env = decl_var env t s in
-				let env' = Env.push local_env' env in
-					env, env', t, s
+					env, local_env, t, s
 		| Constructor s   -> raise (Error (
 			("Constructor of " ^ s.node ^ " out of class declaration"),
 			s.start_pos,
@@ -146,7 +148,10 @@ let rec type_expr env e = match e.node with
 	| Null -> TyTypeNull, Tnull, false
 	| Integer     s -> TyInt, Tint s, false
 	| QIdent (Simple_qident s) ->
-		(try Env.find s.node env, Tvar s.node, true
+		(try let t = Env.find s.node env in
+			match t with
+				| TyFun _ -> t, Tfun s.node, true
+				| _       -> t, Tvar s.node, true
 		with Not_found -> raise (Error (
 					("Undefined identifier '" ^ s.node ^ "'"),
 					s.start_pos,
@@ -164,7 +169,29 @@ let rec type_expr env e = match e.node with
 			else if not (est_sous_type t2 t1) then err "Wrong type" (* TODO : message d'erreur plus étoffé *)
 			else if not (num t1) then err "Only numerical types can be assigned"
 			else t1, Tassign (e1, e2), false
-	| Application (e, args) -> raise TODO
+	| Application (e, args) ->
+		let err m = raise (Error (m, e.start_pos, e.end_pos)) in
+		let t, f, _ = type_expr env e in
+		let fun_t, fun_args, fun_env = match t with
+			| TyFun (t, a, aenv) -> t, a, aenv
+			| _ -> err "A function name was expected here"
+		in
+		let typed_args = List.map (type_expr env) args in
+		let args_type = List.map (fun (t,_,_) -> t) typed_args in
+		let expr_args = List.map (fun (_,e,_) -> e) typed_args in
+		let check =
+			let rec aux a b = match a, b with
+				| []      , []       -> true
+				| v1 :: q1, t2 :: q2 ->
+					let t1 = Env.Local.find v1 fun_env in
+						t1 = t2 && aux q1 q2
+				| _                  -> false
+			in aux fun_args args_type
+		in
+		if not check
+		then err "Given arguments doesn't match expected ones"
+		else
+			fun_t, Tcall (f, expr_args), false
 	| New         (s, args) -> raise TODO
 	| Unop        (op, e) -> raise TODO
 	| Binop       (op, e1, e2) ->
@@ -199,13 +226,14 @@ let rec type_instr (env, instr) = function
 		let t, s = decl_var_extract_name t var in
 		let env' = decl_var env t s in
 		env',
-		(match var_val with
-			| None -> instr
-			| Some (Value    e) ->
-				let _, e', _ = type_expr env e in
-					(Texpr (Tassign (Tvar s.node, e'))) :: instr
-			| Some (Returned _) -> raise TODO
-		)
+		let instr = Tdecl s.node :: instr in
+			(match var_val with
+				| None -> instr
+				| Some (Value    e) ->
+					let _, e', _ = type_expr env e in
+						(Texpr (Tassign (Tvar s.node, e'))) :: instr
+				| Some (Returned _) -> raise TODO
+			)
 	| If_else    (test, instr1, instr2)      ->
 		let t, e, _ = type_expr env test in
 		if t <> TyInt
@@ -238,8 +266,11 @@ let rec type_instr (env, instr) = function
 			else env, Tfree :: instr' @ ((Tmalloc local_env) :: instr)
 	| Cout       expr_list                   ->
 		List.fold_left type_cout (env, instr) expr_list
-	| Return     e                           ->
-		env, (Treturn 0) :: instr
+	| Return     None                        ->
+		env, (Treturn None) :: instr
+	| Return     (Some expr)                 ->
+		let _, e, _ = type_expr env expr in
+			env, (Treturn (Some e)) :: instr
 
 let type_decl (env, decls) = function
 	| Decl_vars  (t, vars) ->
@@ -250,9 +281,10 @@ let type_decl (env, decls) = function
 		decls
 	
 	| Proto_bloc (proto, bloc) ->
-		let env, env', t, s = type_proto env proto in
+		let env, local_env, t, s = type_proto env proto in
+		let env' = Env.push local_env env in
 		let _, instr = type_instr (env', []) (Bloc bloc) in
-			env, Tfun (t, s.node, List.rev instr) :: decls
+			env, Tdeclfun (s.node, List.rev instr, local_env) :: decls
 	| _ -> raise TODO
 
 

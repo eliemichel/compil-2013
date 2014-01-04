@@ -153,19 +153,20 @@ and ty =
 	| TyInt
 	| TyClass of string
 	| TyPointer of ty
-	| TyFun of ty * ty list (* bonne idée ou pas ? *)
+	| TyFun of ty * string list * ty Env.Local.t (* bonne idée ou pas ? *)
 
 
 and t_decl =
-	| Tfun of ty * string * t_instr list
+	| Tdeclfun of string * t_instr list * ty Env.Local.t
 
 and t_instr =
 	| Texpr of t_expr
+	| Tdecl of string
 	| Tifelse of t_expr * t_instr list * t_instr list
 	| Tfor of t_expr list * t_expr * t_expr list * t_instr list
 	| Tcout_expr of t_expr
 	| Tcout_str of string
-	| Treturn of int
+	| Treturn of t_expr option
 	| Tmalloc of ty Env.Local.t
 	| Tfree
 
@@ -174,7 +175,9 @@ and t_expr =
 	| Tnull
 	| Tint of string
 	| Tvar  of string
+	| Tfun of string
 	| Tassign of t_expr * t_expr
+	| Tcall of t_expr * t_expr list
 	(*| Tunop of unop * t_expr*)
 	| Tbinop of t_binop * t_expr * t_expr
 

@@ -127,6 +127,27 @@ Problème avec ce genre de code :
 
 J'ai décidé d'abandonner la distinction variables globales / variables locales.
 
+Ne pas oublier de vérifier l'inclusion de `iostream` pour autoriser `std::cout`.
+
+Pb de priorité compéré à g++ : `cout << i = 42 << "\n"` génère une erreur car
+`<<` est prioritaire sur `=`.
+
+C'est bon pour les variables ! Passons aux fonctions.
+
+Il faudra vérifier que le type de l'expression retournée est correct.
+
+Beaucoup d'ennuis avec les structures persistantes et l'ordre d'évaluation des
+opérandes.
+
+**Faire attention en passant aux fonctions à plusieurs arguments !** Pour ce qui
+est des fonctions à 1 argument, c'est bon.
+
+Programme des étapes à venir :
+
+ * Gérer les fonctions à plusieurs arguments
+ * Ajouter les pointeurs
+ * Gérer les passages par référence
+ * Attaquer les objets :-°
 
 
 

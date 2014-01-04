@@ -1,10 +1,16 @@
+#include <iostream>
 // ./minic++ test.cpp 1> /tmp/mips1.s && echo "-=-=-=-=-" && cat /tmp/mips1.s && echo "-=-=-=-=-" && mars /tmp/mips1.s
 
 int i, j;
 
-int main(int argn, int **arv) {
+int fun (int x) {
+	int y = x + 1;
+	return y;
+}
+
+int main() {
 	std::cout << "\nThe answer " << "is ";
-	std::cout << i = ((43 - 1)  + 360 * 27) % 360 << " - " << i;
+	std::cout << (i = ((43 - 1)  + 360 * 27) % 360) << " - " << i;
 	i = 5 + 2 * 42;
 	std::cout << "..." << i - 47;
 	if (i < 0)
@@ -27,10 +33,14 @@ int main(int argn, int **arv) {
 		i = i + 1;
 	}
 	
-	
+	i = 0;
 	int j = 4;
-	std::cout << "| j = " << j;
+	std::cout << "| fun (j) = " << fun (j);
 	
 	return 0;
 }
+
+
+
+
 
