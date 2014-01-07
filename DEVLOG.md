@@ -150,5 +150,9 @@ Programme des étapes à venir :
  * Attaquer les objets :-°
 
 
+## 07/01/2014
+
+Fonctions à plusieurs arguments : Done.
+
 
 

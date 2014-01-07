@@ -3,9 +3,9 @@
 
 int i, j;
 
-int fun (int x) {
-	int y = x + 1;
-	return y;
+int fun (int x, int y) {
+	int z = x - y;
+	return z;
 }
 
 int main() {
@@ -35,7 +35,7 @@ int main() {
 	
 	i = 0;
 	int j = 4;
-	std::cout << "| fun (j) = " << fun (j);
+	std::cout << "| fun (j) = " << fun (j, 1);
 	
 	return 0;
 }

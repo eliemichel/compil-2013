@@ -157,7 +157,7 @@ and ty =
 
 
 and t_decl =
-	| Tdeclfun of string * t_instr list * ty Env.Local.t
+	| Tdeclfun of string * string list * ty Env.Local.t * t_instr list
 
 and t_instr =
 	| Texpr of t_expr

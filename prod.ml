@@ -65,9 +65,25 @@ let make_addr_env env =
 	in
 		Env.Local.fold aux env (Env.Local.empty, 0)
 
+let make_addr_env_ordered order env =
+	let aux k (addr_env, c) =
+		let t = Env.Local.find k env in
+		let size = size_of_ty t in
+			Env.Local.add k (c, false) addr_env,
+			c + size
+	in
+		List.fold_right aux order (Env.Local.empty, 0)
+
 
 let malloc env =
 	let addr_env, n = make_addr_env env in
+		incr bloc_count;
+		global_env := Env.push addr_env !global_env;
+		push_bloc ++
+		push n
+
+let malloc_ordered order env =
+	let addr_env, n = make_addr_env_ordered order env in
 		incr bloc_count;
 		global_env := Env.push addr_env !global_env;
 		push_bloc ++
@@ -214,8 +230,8 @@ and compile_instr = function
 
 
 let compile_decl = function
-	| Tdeclfun (s, instrs, local_env) ->
-		ignore (malloc local_env);
+	| Tdeclfun (s, args, local_env, instrs) ->
+		ignore (malloc_ordered args local_env);
 		global_env := Env.decl !global_env;
 		let body = compile_instrs instrs in
 		ignore (free ());

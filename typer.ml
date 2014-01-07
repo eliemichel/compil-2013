@@ -100,7 +100,7 @@ let type_proto env proto =
 			let t, s = decl_function_extract_name t qvar in
 			let t = TyFun (t, args, local_env) in
 				let env = decl_var env t s in
-					env, local_env, t, s
+					env, local_env, args, t, s
 		| Constructor s   -> raise (Error (
 			("Constructor of " ^ s.node ^ " out of class declaration"),
 			s.start_pos,
@@ -281,10 +281,10 @@ let type_decl (env, decls) = function
 		decls
 	
 	| Proto_bloc (proto, bloc) ->
-		let env, local_env, t, s = type_proto env proto in
+		let env, local_env, args, t, s = type_proto env proto in
 		let env' = Env.push local_env env in
 		let _, instr = type_instr (env', []) (Bloc bloc) in
-			env, Tdeclfun (s.node, List.rev instr, local_env) :: decls
+			env, Tdeclfun (s.node, args, local_env, List.rev instr) :: decls
 	| _ -> raise TODO
 
 
