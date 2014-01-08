@@ -23,6 +23,7 @@ let pop n = mips [ Arith (Mips.Add, SP, SP, Oimm n) ]
 
 let push_r r = mips [ Sw (r, Areg (0, SP)) ] ++ push 4
 let pop_r r = pop 4 ++ mips [ Lw (r, Areg(0, SP)) ]
+let peek_r r = mips [ Lw (r, Areg(4, SP)) ]
 
 let push_bloc = push_r FP ++ mips [ Move (FP, SP) ]
 let pop_bloc = mips [ Move (SP, FP) ] ++ pop_r FP
@@ -33,8 +34,6 @@ let arith_of_binop = function
 	| Tmult -> Mul
 	| Tdiv  -> Div
 	| Tmod  -> Rem
-	| Tand  -> And
-	| Tor   -> Or
 
 let set_of_binop = function
 	| Teq  -> Eq
@@ -112,7 +111,7 @@ let rec compile_expr_g = function
 			malloc Env.Local.empty
 		in
 		let p2 =
-			compile_exprs args ++
+			compile_args args ++
 			compile_expr f ++
 			pop_r A0 ++
 			mips [ Jalr A0 ] ++
@@ -137,6 +136,13 @@ let rec compile_expr_g = function
 	| Tdereference e ->
 		compile_expr e
 
+
+and compile_args args =
+	let aux (arg, r) =
+		if r
+		then compile_expr_g arg
+		else compile_expr   arg
+	in List.fold_right (++) (List.map aux args) nop
 
 and compile_exprs i = List.fold_right (++) (List.map compile_expr i) nop
 
@@ -183,7 +189,7 @@ and compile_expr = function
 			malloc Env.Local.empty
 		in
 		let p2 =
-			compile_exprs args ++
+			compile_args args ++
 			compile_expr f ++
 			pop_r A0 ++
 			mips [ Jalr A0 ] ++
@@ -194,6 +200,17 @@ and compile_expr = function
 			(if r then mips [ Lw (A0, Areg (0, A0)) ] else nop) ++
 			push_r A0
 		in p1 ++ p2 ++ p3
+	| Tbinop (Tlazy op, e1, e2) ->
+		let cont = get_new_control_label () in
+			compile_expr e1 ++
+			peek_r A0 ++
+			mips [ if op = Tand
+				then Beqz (A0, cont)
+				else Bnez (A0, cont)
+			] ++
+			pop 4 ++
+			compile_expr e2 ++
+			mips [ Label cont ]
 	| Tbinop (op, e1, e2) ->
 		compile_expr e1 ++
 		compile_expr e2 ++
@@ -202,6 +219,7 @@ and compile_expr = function
 		mips [ match op with
 			| Tarith o -> Arith (arith_of_binop o, A0, A0, Oreg A1)
 			| Tset   o -> Set   (set_of_binop   o, A0, A0, Oreg A1)
+			| _ -> assert false
 		] ++
 		push_r A0
 	| Tnot e ->
@@ -312,10 +330,16 @@ and compile_instr = function
 
 
 let compile_decl = function
-	| Tdeclfun (s, args, local_env, instrs) ->
+	| Tdeclfun (s, v, args, local_env, instrs) ->
 		ignore (malloc_ordered args local_env);
 		global_env := Env.decl !global_env;
-		let body = compile_instrs instrs in
+		let body =
+			compile_instrs instrs ++
+			pop_n_bloc (!bloc_count - 2) ++
+			pop_r RA ++
+			(if not v then push_r A0 else nop) ++
+			mips [ Jr RA ]
+		in
 		ignore (free ());
 			mips [ Label s ] ++
 			push_r RA ++

@@ -157,10 +157,10 @@ instruction:
 			in
 				For (li, e, la, instr)
 		}
-	| b = bloc                      { Bloc b   }
+	| b = bloc                           { Bloc b   }
 	| COUT FLOW l = separated_nonempty_list(FLOW, expr_flow) SEMCOL
-	                                { Cout l   }
-	| RETURN e = expr? SEMCOL       { Return e }
+	                                     { Cout l   }
+	| RETURN e = position(expr?) SEMCOL  { Return e }
 
 
 expr_flow:

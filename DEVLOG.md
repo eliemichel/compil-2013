@@ -180,6 +180,13 @@ sans avoir à modifier tout le code.
 c'est bizarre, l'annoncé impose pas de vérifier que la valeur du return est bien typée.
 Enfin je vais le faire quand même.
 
+Pour les appels de fonctions, les types doivent-ils être exactement égaux ou juste
+être des sous-types ? Après tout, ce ne sont que des assignations.
+
+J'ai commencé à me baser sur les exemples données. J'ai pu perfectionner les
+références (le passage par référence plantait) ainsi que gérer des cas comme
+l'absence de `return` auxquels je n'avais pas pensé. J'avais également oublié
+l'évaluation paresseuse des booléens.
 
 
 

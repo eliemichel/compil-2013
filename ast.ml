@@ -76,7 +76,7 @@ and instruction =
 	| For        of expression list * expression * expression list * instruction
 	| Bloc       of bloc
 	| Cout       of expr_flow list
-	| Return     of expression option
+	| Return     of expression option pos_node
 
 and expr_flow =
 	| Expression_in_flow of expression
@@ -157,7 +157,7 @@ and ty =
 
 
 and t_decl =
-	| Tdeclfun of string * string list * (ty * bool) Env.Local.t * t_instr list
+	| Tdeclfun of string * bool * string list * (ty * bool) Env.Local.t * t_instr list
 
 and t_instr =
 	| Texpr of t_expr
@@ -178,7 +178,7 @@ and t_expr =
 	| Tfun of string
 	| Tassign of t_expr * t_expr
 	| Trefinit of string * t_expr
-	| Tcall of t_expr * bool * t_expr list
+	| Tcall of t_expr * bool * (t_expr * bool) list
 	| Tbinop of t_binop * t_expr * t_expr
 	| Tnot of t_expr
 	| Tincrleft of t_expr
@@ -189,8 +189,13 @@ and t_expr =
 	| Tdereference of t_expr
 
 and t_binop =
+	| Tlazy  of t_binop_lazy
 	| Tarith of t_binop_arith
 	| Tset   of t_binop_set
+
+and t_binop_lazy =
+	| Tand
+	| Tor
 
 and t_binop_arith =
 	| Tadd
@@ -198,8 +203,6 @@ and t_binop_arith =
 	| Tmult
 	| Tdiv
 	| Tmod
-	| Tand
-	| Tor
 
 and t_binop_set =
 	| Teq

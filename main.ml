@@ -57,6 +57,7 @@ let main filename =
 			print_error ("Typing error: " ^ err) sp ep;
 			exit 1
 			)
+		(*| _ -> exit 2 TODO : décommenter*)
 	in
 	if !type_only then exit 0
 	else
