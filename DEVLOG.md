@@ -165,6 +165,16 @@ J'ai géré les entités \x** dans les chaînes mais pour une raisons qui m'est 
 
 ## 08/01/2014
 
+TODO : gérer typer la valeur des `return` -> OK
+
+/!\ Écrire de l'arbre syntaxique à la main n'est pas une bonne idée : on oublie
+de vérifier certains points.
+
+TODO : Utiliser Format.sprintf pour les message d'erreur
+
+
+
+
 
 
 

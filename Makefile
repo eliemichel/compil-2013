@@ -37,18 +37,20 @@ $(BIN): $(CMX)
 .mly.mli:
 	menhir -v $<
 
-.PHONY: clean
+.PHONY: all clean dep
 
 clean:
 	@echo "Cleaning directory..."
 	@rm -v -f .depend *.cmi *.o *.automaton *.conflicts *~ $(BIN) $(CMX) $(GEN)
 	@echo "$(OK_COLOR)Done.$(NO_COLOR)"
 
+dep: all
+
 .depend: $(GEN)
 	rm -f .depend
 	ocamldep *.mli *.ml > .depend
 
-ifneq ($(MAKECMDGOALS),clean)
+ifeq ($(MAKECMDGOALS),dep)
 include .depend
 endif
 

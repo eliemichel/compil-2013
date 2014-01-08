@@ -30,8 +30,7 @@
 			List.iter (fun (s, t) -> Hashtbl.add h s t) keywords_assoc;
 			fun s ->
 				try
-					let s = String.lowercase s in
-						Hashtbl.find h s
+					Hashtbl.find h s
 				with Not_found -> (
 					if Hashtbl.mem Ast.tidentTbl s
 					then TIDENT s

@@ -153,11 +153,11 @@ and ty =
 	| TyInt
 	| TyClass of string
 	| TyPointer of ty
-	| TyFun of ty * string list * ty Env.Local.t (* bonne idée ou pas ? *)
+	| TyFun of ty * (string * bool) list * ty Env.Local.t (* bonne idée ou pas ? *)
 
 
 and t_decl =
-	| Tdeclfun of string * string list * ty Env.Local.t * t_instr list
+	| Tdeclfun of string * (string * bool) list * ty Env.Local.t * t_instr list
 
 and t_instr =
 	| Texpr of t_expr

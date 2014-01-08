@@ -1,5 +1,6 @@
 open Ast
 open Lexing
+open Format
 
 exception Error of string * position * position
 
@@ -7,17 +8,21 @@ let (globals : (string, ty) Hashtbl.t) = Hashtbl.create 17
 
 
 let rec string_of_ty = function
-	| TyTypeNull       -> "TyTypeNull"
-	| TyVoid           -> "TyVoid"
-	| TyInt            -> "TyInt"
-	| TyClass s        -> "TyClass " ^ s
-	| TyPointer t      -> "TyPointer " ^ (string_of_ty t)
-	| TyFun (rt, argt, argenv) ->
-		"TyFun : " ^
+	| TyTypeNull       -> "NULL"
+	| TyVoid           -> "void"
+	| TyInt            -> "int"
+	| TyClass s        -> s
+	| TyPointer t      -> (string_of_ty t) ^ "*"
+	| TyFun (rt, args, argenv) ->
+		"Function : " ^
 		(List.fold_left
-			(fun s t -> s ^ ", " ^ (string_of_ty (Env.Local.find s argenv)))
+			(fun s (v, r) ->
+				s ^ ", " ^
+				(string_of_ty (Env.Local.find v argenv)) ^
+				(if r then "&" else "")
+			)
 			""
-			argt
+			args
 		) ^
 		" -> " ^
 		(string_of_ty rt)
@@ -34,23 +39,31 @@ let rec convert_type = function
 
 
 let rec decl_var_extract_name t = function
-	| Ident  s          -> convert_type t, s
+	| Ident  s          -> convert_type t, s, false
 	| Pointer_value v   ->
-		let t', s = decl_var_extract_name t v in
-			TyPointer t', s
-	| Address (Ident s) -> raise TODO (* Autoriser plus qu'un ident *)
-	| Address v         ->
-		let _, s = decl_var_extract_name t v in
-			raise (Error (
-				("Unexpected `&` in declaration of " ^ s.node),
+		let t', s, r = decl_var_extract_name t v in
+			if r
+			then raise (Error (
+				("Pointer to reference is not possible (in declaration of " ^ s.node ^ ")"),
 				s.start_pos,
 				s.end_pos
 				))
+			else
+				TyPointer t', s, false
+	| Address v         ->
+		let t', s, r = decl_var_extract_name t v in
+			if r
+			then raise (Error (
+				("Reference to reference is not possible (in declaration of " ^ s.node ^ ")"),
+				s.start_pos,
+				s.end_pos
+				))
+			else t', s, true
 
 
 let convert_qident  = function
 	| Simple_qident     s      -> s
-	| Namespace_qident (ns, s) -> ignore (ns, s) ; raise TODO
+	| Namespace_qident (ns, s) -> raise TODO
 
 
 let rec decl_function_extract_name t = function
@@ -81,15 +94,22 @@ let decl_var env t s =
 	)
 
 let decl_glob_var env t v =
-	let t, s = decl_var_extract_name t v in
-		Hashtbl.add globals s.node t;
-		decl_var env t s
+	let t, s, r = decl_var_extract_name t v in
+		if r
+		then raise (Error (
+				("Uninitialized reference : " ^ s.node),
+				s.start_pos,
+				s.end_pos
+				))
+		else
+			Hashtbl.add globals s.node t;
+			decl_var env t s
 
 let type_proto env proto =
 	let args, local_env = List.fold_left (* /!\ List.rev *)
 		(fun (l, loc) (t, v) ->
-			let t, s = decl_var_extract_name t v in
-				s.node :: l,
+			let t, s, r = decl_var_extract_name t v in
+				(s.node, r) :: l,
 				Env.Local.add s.node t loc
 		)
 		([], Env.Local.empty)
@@ -176,31 +196,34 @@ let rec type_expr env e = match e.node with
 		let t1, e1, g1 = type_expr env e1 in
 		let t2, e2, g2 = type_expr env e2 in
 		let err m = raise (Error (m, e.start_pos, e.end_pos)) in
-			     if not g1 then err "Invalid left member"
-			else if not (est_sous_type t2 t1) then err "Wrong type" (* TODO : message d'erreur plus étoffé *)
-			else if not (num t1) then err "Only numerical types can be assigned"
+			     if not g1
+				then err "Invalid left member"
+			else if not (est_sous_type t2 t1)
+				then err ("'" ^ (string_of_ty t2) ^ "' is not a valid subtype of '" ^ (string_of_ty t2) ^ "'")
+			else if not (num t1)
+				then err ("'" ^ (string_of_ty t1) ^ "' can't be assigned (not a numeric type)")
 			else t1, Tassign (e1, e2), false
 	| Application (e, args) ->
 		let err m = raise (Error (m, e.start_pos, e.end_pos)) in
 		let t, f, _ = type_expr env e in
 		let fun_t, fun_args, fun_env = match t with
 			| TyFun (t, a, aenv) -> t, a, aenv
-			| _ -> err "A function name was expected here"
+			| _ -> err "A function was expected"
 		in
 		let typed_args = List.map (type_expr env) args in
-		let args_type = List.map (fun (t,_,_) -> t) typed_args in
+		let args_type = List.map (fun (t,_,g) -> (t,g)) typed_args in
 		let expr_args = List.map (fun (_,e,_) -> e) typed_args in
 		let check =
 			let rec aux a b = match a, b with
 				| []      , []       -> true
-				| v1 :: q1, t2 :: q2 ->
+				| (v1, r) :: q1, (t2, g) :: q2 ->
 					let t1 = Env.Local.find v1 fun_env in
-						t1 = t2 && aux q1 q2
+						(g || (not r)) && t1 = t2 && aux q1 q2
 				| _                  -> false
 			in aux fun_args args_type
 		in
 		if not check
-		then err "Given arguments doesn't match expected ones"
+		then err "Given arguments doesn't match expected ones" (*TODO : expliciter le message d'erreur*)
 		else
 			fun_t, Tcall (f, expr_args), false
 	| New         (s, args) -> raise TODO
@@ -210,16 +233,19 @@ let rec type_expr env e = match e.node with
 		let rt, rg =
 		match op with
 			| Not | Minus | Plus ->
-				if t != TyInt then err "An integer was expected"
+				if t != TyInt
+				then err ("'" ^ (string_of_ty t) ^ "' is not integer")
 				else TyInt, false
 			| IncrLeft | DecrLeft | IncrRight | DecrRight ->
-				     if t != TyInt then err "An integer was expected"
-				else if not g then err "A left value was expected"
+				     if t != TyInt
+					then err ("'" ^ (string_of_ty t) ^ "' is not integer")
+				else if not g
+					then err "A left value was expected"
 				else TyInt, false
 			| Star ->
 				(match t with
 				| TyPointer t' -> t', true
-				| _           -> err "A pointer value was expected"
+				| _           -> err ("'" ^ (string_of_ty t) ^ "' is not a pointer type")
 				)
 			| Amp ->
 				if not g then err "A left value was expected"
@@ -230,10 +256,14 @@ let rec type_expr env e = match e.node with
 		let t2, e2, g2 = type_expr env e2 in
 		let err m = raise (Error (m, e.start_pos, e.end_pos)) in
 		let comp = op = Dbleq || op = Neq in
-			     if comp && t1 <> t2 then err "Compared values must have the same type"
-			else if comp && not (num t1) then err "Only numerical types can be compared"
-			else if t1 <> TyInt then err "The first operand was expected to be an integer"
-			else if t2 <> TyInt then err "The second operand was expected to be an integer"
+			     if comp && t1 <> t2
+				then err ("'" ^ (string_of_ty t2) ^ "' can not be compared to '" ^ (string_of_ty t1) ^ "'")
+			else if comp && not (num t1)
+				then err ("'" ^ (string_of_ty t1) ^ "' can not be compared (not a numeric types)")
+			else if t1 <> TyInt
+				then err ("The first operand was expected to be an integer but is '" ^ (string_of_ty t1) ^ "'")
+			else if t2 <> TyInt
+				then err ("The second operand was expected to be an integer but is '" ^ (string_of_ty t2) ^ "'")
 			else TyInt, Tbinop (t_binop_of_binop op, e1, e2), false
 
 
@@ -242,7 +272,7 @@ let type_cout (env, instr) = function
 		let t, te, _ = type_expr env e in
 			if t <> TyInt
 			then raise (
-					Error ("Only integers and strings can be printed", e.start_pos, e.end_pos)
+					Error (("Only integers and strings can be printed ('" ^ (string_of_ty t) ^ "' given)"), e.start_pos, e.end_pos)
 				)
 			else
 				env, Tcout_expr te :: instr
@@ -255,15 +285,29 @@ let rec type_instr (env, instr) = function
 		let _, e, _ = type_expr env e in
 			env, Texpr e :: instr
 	| Var_init   (t, var, var_val)           ->
-		let t, s = decl_var_extract_name t var in
+		let t, s, r = decl_var_extract_name t var in (*TODO : gérer les refs*)
 		let env' = decl_var env t s in
 		env',
 		let instr = Tdecl s.node :: instr in
 			(match var_val with
-				| None -> instr
+				| None ->
+					if r
+					then raise (Error (
+						("Uninitialized reference : " ^ s.node),
+						s.start_pos,
+						s.end_pos
+						))
+					else instr
 				| Some (Value    e) ->
-					let _, e', _ = type_expr env e in
-						(Texpr (Tassign (Tvar s.node, e'))) :: instr
+					let ident = { e with node = QIdent (Simple_qident s) } in
+					let e' =
+						if r
+						then { e with node = Unop (Amp, e) }
+						else e
+					in
+					let expr  = { e with node = Eq (ident, e') } in
+					let _, t_e, _ = type_expr env' expr in
+						(Texpr t_e) :: instr
 				| Some (Returned _) -> raise TODO
 			)
 	| If_else    (test, instr1, instr2)      ->

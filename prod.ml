@@ -66,10 +66,10 @@ let make_addr_env env =
 		Env.Local.fold aux env (Env.Local.empty, 0)
 
 let make_addr_env_ordered order env =
-	let aux k (addr_env, c) =
-		let t = Env.Local.find k env in
+	let aux (v, r) (addr_env, c) = (*TODO : gérer les refs*)
+		let t = Env.Local.find v env in
 		let size = size_of_ty t in
-			Env.Local.add k (c, false) addr_env,
+			Env.Local.add v (c, false) addr_env,
 			c + size
 	in
 		List.fold_right aux order (Env.Local.empty, 0)
