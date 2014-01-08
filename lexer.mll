@@ -4,7 +4,6 @@
 	
 	exception Error of string
 	
-	let s_acc = ref ""
 	
 	let keywords_assoc = [
 		"class",   CLASS;
@@ -92,7 +91,7 @@ rule token = parse
 	| whitespace                { token lexbuf }
 	| ident as id               { id_or_keyword id }
 	| entier as n               { INTEGER n }
-	| '"'    { s_acc := "" ; chaine lexbuf ; STRING !s_acc }
+	| '"'    { STRING (chaine "" lexbuf) }
 	| '{'    { LBRACE }
 	| '}'    { RBRACE }
 	| '('    { LPAR }
@@ -134,16 +133,16 @@ and comment = parse
 	| _     { comment lexbuf }
 	| eof   { raise (Error "unexpected end of file (unterminated commentary)")}
 
-and chaine = parse
+and chaine s = parse
 	| ([' '-'~'] # ['\\' '"']) as c
-		{ s_acc := !s_acc ^ (String.make 1 c) ; chaine lexbuf }
-	| "\\\\" { s_acc := !s_acc ^ "\\" ; chaine lexbuf }
-	| "\\\"" { s_acc := !s_acc ^ "\"" ; chaine lexbuf }
-	| "\\n"  { s_acc := !s_acc ^ "\n" ; chaine lexbuf }
-	| "\\t"  { s_acc := !s_acc ^ "\t" ; chaine lexbuf }
+		{ chaine (s ^ (String.make 1 c)) lexbuf }
+	| "\\\\" { chaine (s ^ "\\") lexbuf }
+	| "\\\"" { chaine (s ^ "\"") lexbuf }
+	| "\\n"  { chaine (s ^ "\n") lexbuf }
+	| "\\t"  { chaine (s ^ "\t") lexbuf }
 	| "\\x" (chiffre_hexa as a) (chiffre_hexa as b)
-		{ s_acc := !s_acc ^ (fromAscii a b) ; chaine lexbuf }
-	| '"'    {}
+		{ chaine (s ^ (fromAscii a b)) lexbuf }
+	| '"'    { s }
 	| _ as c { raise (Error ("unexpected character in string : " ^ String.make 1 c)) }
 	| eof    { raise (Error "unexpected end of file (unterminated string)") }
 

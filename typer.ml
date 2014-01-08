@@ -286,7 +286,7 @@ let rec type_instr (env, instr) = function
 			env, Texpr e :: instr
 	| Var_init   (t, var, var_val)           ->
 		let t, s, r = decl_var_extract_name t var in (*TODO : gérer les refs*)
-		let env' = decl_var env t s in
+		let env' = decl_var env t s r in
 		env',
 		let instr = Tdecl s.node :: instr in
 			(match var_val with
@@ -299,15 +299,13 @@ let rec type_instr (env, instr) = function
 						))
 					else instr
 				| Some (Value    e) ->
-					let ident = { e with node = QIdent (Simple_qident s) } in
-					let e' =
-						if r
-						then { e with node = Unop (Amp, e) }
-						else e
-					in
-					let expr  = { e with node = Eq (ident, e') } in
-					let _, t_e, _ = type_expr env' expr in
-						(Texpr t_e) :: instr
+					let t', e', g' = type_expr env e in
+					let err m = raise (Error (m, e.start_pos, e.end_pos)) in
+						     if not (est_sous_type t' t)
+							then err ("'" ^ (string_of_ty t') ^ "' is not a valid subtype of '" ^ (string_of_ty t) ^ "'")
+						else if not g' && r
+							then err "A left value was expected"
+						else (Texpr (Tassign (Tvar s.node, e'))) :: instr
 				| Some (Returned _) -> raise TODO
 			)
 	| If_else    (test, instr1, instr2)      ->
