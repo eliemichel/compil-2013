@@ -123,7 +123,7 @@ let rec est_sous_type t1 t2 = match t1, t2 with
 	| _ -> false
 
 
-let t_op_of_op = function
+let t_binop_of_binop = function
 	| Dbleq -> Tset Teq
 	| Neq   -> Tset Tneq
 	| Lt    -> Tset Tlt
@@ -137,6 +137,17 @@ let t_op_of_op = function
 	| Mod   -> Tarith Tmod
 	| And   -> Tarith Tand
 	| Or    -> Tarith Tor
+
+let t_unop_of_unop op expr = match op with
+	| Not       -> Tnot expr
+	| Minus     -> Tbinop (Tarith Tsub, Tint "0", expr)
+	| Plus      -> expr
+	| IncrLeft  -> Tincrleft expr
+	| DecrLeft  -> Tdecrleft expr
+	| IncrRight -> Tincrright expr
+	| DecrRight -> Tdecrright expr
+	| Star      -> Tdereference expr
+	| Amp       -> Tgetaddr expr
 
 let rec type_expr env e = match e.node with
 	| This -> (
@@ -193,7 +204,27 @@ let rec type_expr env e = match e.node with
 		else
 			fun_t, Tcall (f, expr_args), false
 	| New         (s, args) -> raise TODO
-	| Unop        (op, e) -> raise TODO
+	| Unop        (op, e') ->
+		let err m = raise (Error (m, e.start_pos, e.end_pos)) in
+		let t, e', g = type_expr env e' in
+		let rt, rg =
+		match op with
+			| Not | Minus | Plus ->
+				if t != TyInt then err "An integer was expected"
+				else TyInt, false
+			| IncrLeft | DecrLeft | IncrRight | DecrRight ->
+				     if t != TyInt then err "An integer was expected"
+				else if not g then err "A left value was expected"
+				else TyInt, false
+			| Star ->
+				(match t with
+				| TyPointer t' -> t', true
+				| _           -> err "A pointer value was expected"
+				)
+			| Amp ->
+				if not g then err "A left value was expected"
+				else TyPointer t, false
+		in rt, t_unop_of_unop op e', rg
 	| Binop       (op, e1, e2) ->
 		let t1, e1, g1 = type_expr env e1 in
 		let t2, e2, g2 = type_expr env e2 in
@@ -201,8 +232,9 @@ let rec type_expr env e = match e.node with
 		let comp = op = Dbleq || op = Neq in
 			     if comp && t1 <> t2 then err "Compared values must have the same type"
 			else if comp && not (num t1) then err "Only numerical types can be compared"
-			else if t1 <> TyInt || t2 <> TyInt then err "Int expected"
-			else TyInt, Tbinop (t_op_of_op op, e1, e2), false
+			else if t1 <> TyInt then err "The first operand was expected to be an integer"
+			else if t2 <> TyInt then err "The second operand was expected to be an integer"
+			else TyInt, Tbinop (t_binop_of_binop op, e1, e2), false
 
 
 let type_cout (env, instr) = function

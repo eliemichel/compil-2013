@@ -4,6 +4,8 @@
 	
 	exception Error of string
 	
+	let s_acc = ref ""
+	
 	let keywords_assoc = [
 		"class",   CLASS;
 		"else",    ELSE;
@@ -37,6 +39,30 @@
 				)
 	
 	
+	let convert_hexa c = match Char.lowercase c with
+		| '0' -> 0
+		| '1' -> 1
+		| '2' -> 2
+		| '3' -> 3
+		| '4' -> 4
+		| '5' -> 5
+		| '6' -> 6
+		| '7' -> 7
+		| '8' -> 8
+		| '9' -> 9
+		| 'a' -> 10
+		| 'b' -> 11
+		| 'c' -> 12
+		| 'd' -> 13
+		| 'e' -> 14
+		| 'f' -> 15
+		|  c  -> raise (Invalid_argument ("convert_hexa : " ^ (String.make 1 c)))
+	
+	let fromAscii a b =
+		let c = (convert_hexa a) lsl 4 + (convert_hexa b) in
+			String.make 1 (Char.chr c)
+	
+	
 	let newline lexbuf =
 		let pos = lexbuf.lex_curr_p in
 			lexbuf.lex_curr_p <- {
@@ -58,14 +84,6 @@ let entier =
 	| ['1'-'9'] chiffre*
 	| '0' chiffre_octal+
 	| "0x" chiffre_hexa+
-let caractere =
-	  [' '-'~'] # ['\\' '"']
-	| "\\\\"
-	| "\\\""
-	| "\\n"
-	| "\\t"
-	| "\\x" chiffre_hexa chiffre_hexa
-let chaine = '"' caractere* '"'
 
 let whitespace = [' ' '\t']+
 let commentaire_simple = "//" [^'\n']* '\n'
@@ -75,7 +93,7 @@ rule token = parse
 	| whitespace                { token lexbuf }
 	| ident as id               { id_or_keyword id }
 	| entier as n               { INTEGER n }
-	| '"' (caractere* as s) '"' { STRING s }
+	| '"'    { s_acc := "" ; chaine lexbuf ; STRING !s_acc }
 	| '{'    { LBRACE }
 	| '}'    { RBRACE }
 	| '('    { LPAR }
@@ -116,6 +134,19 @@ and comment = parse
 	| "*/"  { token lexbuf }
 	| _     { comment lexbuf }
 	| eof   { raise (Error "unexpected end of file (unterminated commentary)")}
+
+and chaine = parse
+	| ([' '-'~'] # ['\\' '"']) as c
+		{ s_acc := !s_acc ^ (String.make 1 c) ; chaine lexbuf }
+	| "\\\\" { s_acc := !s_acc ^ "\\" ; chaine lexbuf }
+	| "\\\"" { s_acc := !s_acc ^ "\"" ; chaine lexbuf }
+	| "\\n"  { s_acc := !s_acc ^ "\n" ; chaine lexbuf }
+	| "\\t"  { s_acc := !s_acc ^ "\t" ; chaine lexbuf }
+	| "\\x" (chiffre_hexa as a) (chiffre_hexa as b)
+		{ s_acc := !s_acc ^ (fromAscii a b) ; chaine lexbuf }
+	| '"'    {}
+	| _ as c { raise (Error ("unexpected character in string : " ^ String.make 1 c)) }
+	| eof    { raise (Error "unexpected end of file (unterminated string)") }
 
 
 

@@ -178,8 +178,14 @@ and t_expr =
 	| Tfun of string
 	| Tassign of t_expr * t_expr
 	| Tcall of t_expr * t_expr list
-	(*| Tunop of unop * t_expr*)
 	| Tbinop of t_binop * t_expr * t_expr
+	| Tnot of t_expr
+	| Tincrleft of t_expr
+	| Tdecrleft of t_expr
+	| Tincrright of t_expr
+	| Tdecrright of t_expr
+	| Tgetaddr of t_expr
+	| Tdereference of t_expr
 
 and t_binop =
 	| Tarith of t_binop_arith

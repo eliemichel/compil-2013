@@ -154,5 +154,17 @@ Programme des étapes à venir :
 
 Fonctions à plusieurs arguments : Done.
 
+Penser à harmoniser les messages d'erreur.
+
+Ajout des opérateurs unaires. Les pointeurs sont maintenant gérés.
+
+Faire attention aux autres types d'entier !! (octal et hexa)
+
+J'ai géré les entités \x** dans les chaînes mais pour une raisons qui m'est inconnue
+(peut-être à cause de mars) le caractère ESC (\x1b) ne fonctionne pas…
+
+## 08/01/2014
+
+
 
 

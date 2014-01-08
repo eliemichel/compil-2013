@@ -27,6 +27,7 @@ type instruction =
   | Sb of register * address
   | Arith of arith * register * register * operand
   | Neg of register * register
+  | Not of register * register
   | Set of condition * register * register * operand
   | B of label
   | Beq of register * register * label
@@ -128,6 +129,8 @@ let print_instruction fmt = function
 	print_arith a print_register dst print_register src print_operand op
   | Neg (dst, src) ->
       fprintf fmt "\tneg  %a, %a\n" print_register dst print_register src
+  | Not (dst, src) ->
+      fprintf fmt "\tnot  %a, %a\n" print_register dst print_register src
   | Set (cond, dst, src, op) ->
       fprintf fmt "\t%a  %a, %a, %a\n"
 	print_condition cond print_register dst print_register src

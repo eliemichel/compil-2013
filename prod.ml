@@ -104,6 +104,8 @@ let rec pop_n_bloc = function
 
 let rec compile_expr_g = function
 	| Tthis | Tnull | Tint _ | Tassign _ | Tcall _ | Tbinop  _ | Tfun _
+	| Tnot _ | Tincrleft _ | Tdecrleft _ | Tincrright _ | Tdecrright _
+	| Tgetaddr _
 		-> assert false
 	| Tvar  s ->
 		let env = Env.of_bool_env !global_env in
@@ -115,10 +117,11 @@ let rec compile_expr_g = function
 			mips [ Arith (Mips.Sub, A0, FP, Oimm addr) ] ++
 			pop_r FP ++
 			push_r A0
+	| Tdereference e ->
+		compile_expr e
 
 
-
-let rec compile_exprs i = List.fold_right (++) (List.map compile_expr i) nop
+and compile_exprs i = List.fold_right (++) (List.map compile_expr i) nop
 
 and compile_expr = function
 	| Tthis  -> raise TODO
@@ -168,6 +171,50 @@ and compile_expr = function
 			| Tarith o -> Arith (arith_of_binop o, A0, A0, Oreg A1)
 			| Tset   o -> Set   (set_of_binop   o, A0, A0, Oreg A1)
 		] ++
+		push_r A0
+	| Tnot e ->
+		compile_expr e ++
+		pop_r A0 ++
+		mips [ Not (A0, A0)] ++
+		push_r A0
+	| Tincrleft e ->
+		compile_expr_g e ++
+		compile_expr   e ++
+		pop_r A0 ++
+		mips [ Arith (Add, A0, A0, Oimm 1) ] ++
+		pop_r A1 ++
+		mips [ Sw (A0, Areg (0, A1)) ] ++
+		push_r A0
+	| Tdecrleft e -> (* Recopiage de code… Pas beau… *)
+		compile_expr_g e ++
+		compile_expr   e ++
+		pop_r A0 ++
+		mips [ Arith (Sub, A0, A0, Oimm 1) ] ++
+		pop_r A1 ++
+		mips [ Sw (A0, Areg (0, A1)) ] ++
+		push_r A0
+	| Tincrright e ->
+		compile_expr_g e ++
+		compile_expr   e ++
+		pop_r A0 ++
+		mips [ Arith (Add, A2, A0, Oimm 1) ] ++
+		pop_r A1 ++
+		mips [ Sw (A2, Areg (0, A1)) ] ++
+		push_r A0
+	| Tdecrright e ->
+		compile_expr_g e ++
+		compile_expr   e ++
+		pop_r A0 ++
+		mips [ Arith (Sub, A2, A0, Oimm 1) ] ++
+		pop_r A1 ++
+		mips [ Sw (A2, Areg (0, A1)) ] ++
+		push_r A0
+	| Tgetaddr e ->
+		compile_expr_g e
+	| Tdereference e ->
+		compile_expr e ++
+		pop_r A0 ++
+		mips [ Lw (A0, Areg (0, A0)) ] ++
 		push_r A0
 
 
