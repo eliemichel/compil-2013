@@ -16,9 +16,10 @@ let rec string_of_ty = function
 	| TyFun (rt, args, argenv) ->
 		"Function : " ^
 		(List.fold_left
-			(fun s (v, r) ->
+			(fun s v ->
+				let t, r = Env.Local.find v argenv in
 				s ^ ", " ^
-				(string_of_ty (Env.Local.find v argenv)) ^
+				(string_of_ty t) ^
 				(if r then "&" else "")
 			)
 			""
@@ -60,29 +61,35 @@ let rec decl_var_extract_name t = function
 				))
 			else t', s, true
 
-
 let convert_qident  = function
 	| Simple_qident     s      -> s
 	| Namespace_qident (ns, s) -> raise TODO
 
 
-let rec decl_function_extract_name t = function
-	| QIdent_in_qvar qi            -> convert_type t, convert_qident qi
-	| QPointer_value v             ->
-		let t', s = decl_function_extract_name t v in
-			TyPointer t', s
-	| QAddress (QIdent_in_qvar qi) -> raise TODO
-	| QAddress v                   ->
-		let _, s = decl_function_extract_name t v in
-			raise (Error (
-				("Unexpected `&` in declaration of " ^ s.node),
+let rec decl_function_extract_name t = function (* Recopiage… *)
+	| QIdent_in_qvar qi -> convert_type t, convert_qident qi, false
+	| QPointer_value v  ->
+		let t', s, r = decl_function_extract_name t v in
+		if r
+			then raise (Error (
+				("Pointer to reference is not possible (in declaration of " ^ s.node ^ ")"),
 				s.start_pos,
 				s.end_pos
 				))
+			else
+				TyPointer t', s, false
+	| QAddress v       ->
+		let t', s, r = decl_function_extract_name t v in
+			if r
+			then raise (Error (
+				("Reference to reference is not possible (in declaration of " ^ s.node ^ ")"),
+				s.start_pos,
+				s.end_pos
+				))
+			else t', s, true
 
 
-
-let decl_var env t s =
+let decl_var env t s r =
 	if Env.mem_local s.node env
 	then raise (Error (
 		("This variable has already been declared : " ^ s.node),
@@ -90,7 +97,7 @@ let decl_var env t s =
 		s.end_pos
 		))
 	else (
-		Env.add s.node t env
+		Env.add s.node (t, r) env
 	)
 
 let decl_glob_var env t v =
@@ -103,23 +110,23 @@ let decl_glob_var env t v =
 				))
 		else
 			Hashtbl.add globals s.node t;
-			decl_var env t s
+			decl_var env t s r
 
 let type_proto env proto =
 	let args, local_env = List.fold_left (* /!\ List.rev *)
 		(fun (l, loc) (t, v) ->
 			let t, s, r = decl_var_extract_name t v in
-				(s.node, r) :: l,
-				Env.Local.add s.node t loc
+				s.node :: l,
+				Env.Local.add s.node (t, r) loc
 		)
 		([], Env.Local.empty)
 		proto.args
 	in
 	match proto.start with
 		| Function (t, qvar) ->
-			let t, s = decl_function_extract_name t qvar in
+			let t, s, r = decl_function_extract_name t qvar in
 			let t = TyFun (t, args, local_env) in
-				let env = decl_var env t s in
+				let env = decl_var env t s r in
 					env, local_env, args, t, s
 		| Constructor s   -> raise (Error (
 			("Constructor of " ^ s.node ^ " out of class declaration"),
@@ -171,7 +178,7 @@ let t_unop_of_unop op expr = match op with
 
 let rec type_expr env e = match e.node with
 	| This -> (
-		try Env.find "this" env, Tthis, true
+		try fst (Env.find "this" env), Tthis, true
 		with Not_found -> raise (
 				Error ("Undefined identifier 'this'", e.start_pos, e.end_pos)
 			)
@@ -179,7 +186,7 @@ let rec type_expr env e = match e.node with
 	| Null -> TyTypeNull, Tnull, false
 	| Integer     s -> TyInt, Tint s, false
 	| QIdent (Simple_qident s) ->
-		(try let t = Env.find s.node env in
+		(try let t, _ = Env.find s.node env in
 			match t with
 				| TyFun _ -> t, Tfun s.node, true
 				| _       -> t, Tvar s.node, true
@@ -216,8 +223,8 @@ let rec type_expr env e = match e.node with
 		let check =
 			let rec aux a b = match a, b with
 				| []      , []       -> true
-				| (v1, r) :: q1, (t2, g) :: q2 ->
-					let t1 = Env.Local.find v1 fun_env in
+				| v1 :: q1, (t2, g) :: q2 ->
+					let t1, r = Env.Local.find v1 fun_env in
 						(g || (not r)) && t1 = t2 && aux q1 q2
 				| _                  -> false
 			in aux fun_args args_type
@@ -267,7 +274,7 @@ let rec type_expr env e = match e.node with
 			else TyInt, Tbinop (t_binop_of_binop op, e1, e2), false
 
 
-let type_cout (env, instr) = function
+let type_cout env instr = function
 	| Expression_in_flow e ->
 		let t, te, _ = type_expr env e in
 			if t <> TyInt
@@ -275,8 +282,9 @@ let type_cout (env, instr) = function
 					Error (("Only integers and strings can be printed ('" ^ (string_of_ty t) ^ "' given)"), e.start_pos, e.end_pos)
 				)
 			else
-				env, Tcout_expr te :: instr
-	| String_in_flow     s -> env, Tcout_str s :: instr
+				Tcout_expr te :: instr
+	| String_in_flow     s ->
+		Tcout_str s :: instr
 
 
 let rec type_instr (env, instr) = function
@@ -335,11 +343,12 @@ let rec type_instr (env, instr) = function
 			List.fold_left type_instr (Env.push_empty env, []) bloc
 		in
 		let local_env, _ = Env.pop env' in
+			env,
 			if Env.Local.is_empty local_env
-			then env, instr' @ instr
-			else env, Tfree :: instr' @ ((Tmalloc local_env) :: instr)
+			then instr' @ instr
+			else Tfree :: instr' @ ((Tmalloc local_env) :: instr)
 	| Cout       expr_list                   ->
-		List.fold_left type_cout (env, instr) expr_list
+		env, List.fold_left (type_cout env) instr expr_list
 	| Return     None                        ->
 		env, (Treturn None) :: instr
 	| Return     (Some expr)                 ->

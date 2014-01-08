@@ -58,7 +58,7 @@ let decl_local s =
 		global_env := Env.add s (t, true) !global_env
 
 let make_addr_env env =
-	let aux k t (addr_env, c) =
+	let aux k (t, r) (addr_env, c) =
 		let size = size_of_ty t in
 			Env.Local.add k (c, false) addr_env,
 			c + size
@@ -66,8 +66,8 @@ let make_addr_env env =
 		Env.Local.fold aux env (Env.Local.empty, 0)
 
 let make_addr_env_ordered order env =
-	let aux (v, r) (addr_env, c) = (*TODO : gérer les refs*)
-		let t = Env.Local.find v env in
+	let aux v (addr_env, c) = (*TODO : gérer les refs*)
+		let t, r = Env.Local.find v env in
 		let size = size_of_ty t in
 			Env.Local.add v (c, false) addr_env,
 			c + size

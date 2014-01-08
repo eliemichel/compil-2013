@@ -172,6 +172,10 @@ de vérifier certains points.
 
 TODO : Utiliser Format.sprintf pour les message d'erreur
 
+Le type Env n'est pas pratique à modifier
+Il aurait fallu faire un type enregistrement pour pouvoir ajouter des champs
+sans avoir à modifier tout le code.
+
 
 
 

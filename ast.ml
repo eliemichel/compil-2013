@@ -143,7 +143,7 @@ and binop =
 
 type tAst = {
 	declarations : t_decl list;
-	globals      : ty Env.Local.t
+	globals      : (ty * bool) Env.Local.t
 }
 
 
@@ -153,11 +153,11 @@ and ty =
 	| TyInt
 	| TyClass of string
 	| TyPointer of ty
-	| TyFun of ty * (string * bool) list * ty Env.Local.t (* bonne idée ou pas ? *)
+	| TyFun of ty * string list * (ty * bool) Env.Local.t (* bonne idée ou pas ? *)
 
 
 and t_decl =
-	| Tdeclfun of string * (string * bool) list * ty Env.Local.t * t_instr list
+	| Tdeclfun of string * string list * (ty * bool) Env.Local.t * t_instr list
 
 and t_instr =
 	| Texpr of t_expr
@@ -167,7 +167,7 @@ and t_instr =
 	| Tcout_expr of t_expr
 	| Tcout_str of string
 	| Treturn of t_expr option
-	| Tmalloc of ty Env.Local.t
+	| Tmalloc of (ty * bool) Env.Local.t
 	| Tfree
 
 and t_expr =

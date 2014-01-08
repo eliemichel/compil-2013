@@ -71,6 +71,12 @@ int main() {
 	int &t = a;
 	std::cout << "t = " << t << "\n";
 	
+	int foo = 0;
+	for (; foo < 10 ; foo++) {
+		std::cout << foo << "\n";
+		int foo = 0;
+	}
+	
 	return 0;
 }
 
