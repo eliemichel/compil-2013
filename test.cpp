@@ -15,6 +15,10 @@ void swap (int *x, int *y) {
 	return;
 }
 
+int &ref (int *i) {
+	return *i;
+}
+
 int main() {
 	std::cout << "\nThe answer " << "is ";
 	std::cout << (i = ((43 - 1)  + 360 * 27) % 360) << "\n" << i;
@@ -69,13 +73,19 @@ int main() {
 	std::cout << "p = " << *p << "\n";
 	
 	int &t = a;
-	std::cout << "t = " << t << "\n";
+	t = 7;
+	std::cout << "a = " << a << "\n";
 	
 	int foo = 0;
 	for (; foo < 10 ; foo++) {
 		std::cout << foo << "\n";
 		int foo = 0;
 	}
+	
+	int a0 = 75;
+	int& r0 = ref(&a0);
+	ref(&a0) = 128;
+	std::cout << "r0 = " << r0 << "\n";
 	
 	return 0;
 }

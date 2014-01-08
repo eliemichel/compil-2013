@@ -177,7 +177,8 @@ Il aurait fallu faire un type enregistrement pour pouvoir ajouter des champs
 sans avoir à modifier tout le code.
 
 
-
+c'est bizarre, l'annoncé impose pas de vérifier que la valeur du return est bien typée.
+Enfin je vais le faire quand même.
 
 
 

@@ -16,7 +16,7 @@ let rec get_new_control_label () =
 
 let data = ref []
 let bloc_count = ref 0
-let global_env = ref Env.empty (* Une variable globale… pas beau, mais pratique *)
+let global_env : (int * bool * bool) Env.t ref = ref Env.empty (* Une variable globale… pas beau, mais pratique *)
 
 let push n = mips [ Arith (Mips.Sub, SP, SP, Oimm n) ]
 let pop n = mips [ Arith (Mips.Add, SP, SP, Oimm n) ]
@@ -45,31 +45,31 @@ let set_of_binop = function
 	| Tgeq -> Ge
 
 (*Printf.eprintf "%a\n" (Env.print test_ib) !global_env;*)
-let test_ib ff (k, (i,b)) =
-	Printf.fprintf ff "(%s -> %d, %s)" k i (string_of_bool b)
+let test_ib ff (k, (i,r,b)) =
+	Printf.fprintf ff "(%s -> %d, %s, %s)" k i (string_of_bool r) (string_of_bool b)
 
 (*Printf.eprintf "%a\n" (Env.print_local test_t) local_env;*)
-let test_t ff (k, t) =
-	Printf.fprintf ff "(%s -> %s)" k (Typer.string_of_ty t)
+let test_t ff (k, (t,r)) =
+	Printf.fprintf ff "(%s -> %s, %s)" k (Typer.string_of_ty t) (string_of_bool r)
 
 
 let decl_local s =
-	let t, _ = Env.find_local s !global_env in
-		global_env := Env.add s (t, true) !global_env
+	let t, r, _ = Env.find_local s !global_env in
+		global_env := Env.add s (t, r, true) !global_env
 
 let make_addr_env env =
-	let aux k (t, r) (addr_env, c) =
+	let aux v (t, r) (addr_env, c) =
 		let size = size_of_ty t in
-			Env.Local.add k (c, false) addr_env,
+			Env.Local.add v (c, r, false) addr_env,
 			c + size
 	in
 		Env.Local.fold aux env (Env.Local.empty, 0)
 
 let make_addr_env_ordered order env =
-	let aux v (addr_env, c) = (*TODO : gérer les refs*)
+	let aux v (addr_env, c) =
 		let t, r = Env.Local.find v env in
 		let size = size_of_ty t in
-			Env.Local.add v (c, false) addr_env,
+			Env.Local.add v (c, r, false) addr_env,
 			c + size
 	in
 		List.fold_right aux order (Env.Local.empty, 0)
@@ -103,18 +103,35 @@ let rec pop_n_bloc = function
 	| i -> pop_bloc ++ (pop_n_bloc (i - 1))
 
 let rec compile_expr_g = function
-	| Tthis | Tnull | Tint _ | Tassign _ | Tcall _ | Tbinop  _ | Tfun _
-	| Tnot _ | Tincrleft _ | Tdecrleft _ | Tincrright _ | Tdecrright _
-	| Tgetaddr _
+	| Tthis | Tnull | Tint _ | Tassign _ | Trefinit _ | Tbinop  _
+	| Tfun _ | Tnot _ | Tincrleft _ | Tdecrleft _ | Tincrright _ | Tdecrright _
+	| Tgetaddr _ | Tcall (_,false,_)
 		-> assert false
+	| Tcall (f, true, args) ->
+		let p1 =
+			malloc Env.Local.empty
+		in
+		let p2 =
+			compile_exprs args ++
+			compile_expr f ++
+			pop_r A0 ++
+			mips [ Jalr A0 ] ++
+			pop_r A0
+		in
+		let p3 =
+			free () ++
+			push_r A0
+		in p1 ++ p2 ++ p3
 	| Tvar  s ->
 		let env = Env.of_bool_env !global_env in
-		let addr, iter = Env.find_and_localize s env in
-			(*Printf.eprintf "ref %s addr %d iter %d\n" s addr iter;
-			Printf.eprintf "%a\n" (Env.print test_ib) !global_env;*)
+		let (addr, r), iter = Env.find_and_localize s env in
 			push_r FP ++
 			search_locals iter ++
-			mips [ Arith (Mips.Sub, A0, FP, Oimm addr) ] ++
+			mips [
+				if r
+				then Lw (A0, Areg (-addr, FP))
+				else Arith (Mips.Sub, A0, FP, Oimm addr)
+			] ++
 			pop_r FP ++
 			push_r A0
 	| Tdereference e ->
@@ -129,12 +146,13 @@ and compile_expr = function
 	| Tint i -> mips [ Li (A0,  i ) ] ++ push_r A0
 	| Tvar s ->
 		let env = Env.of_bool_env !global_env in
-		let addr, iter = Env.find_and_localize s env in
+		let (addr, r), iter = Env.find_and_localize s env in
 			(*Printf.eprintf "%s addr %d iter %d\n" s addr iter;
 			Printf.eprintf "%a\n" (Env.print test_ib) !global_env;*)
 			push_r FP ++
 			search_locals iter ++
 			mips [ Lw (A0, Areg (-addr, FP)) ] ++
+			(if r then mips [ Lw (A0, Areg (0, A0)) ] else nop) ++
 			pop_r FP ++
 			push_r A0
 	| Tfun s ->
@@ -147,7 +165,20 @@ and compile_expr = function
 		pop_r A1 ++
 		mips [ Sw (A0, Areg (0, A1)) ] ++
 		push_r A0
-	| Tcall (f, args) ->
+	| Trefinit (s, e) ->
+		let env = Env.of_bool_env !global_env in
+		let (addr, r), iter = Env.find_and_localize s env in
+			push_r FP ++
+			search_locals iter ++
+			mips [ Arith (Mips.Sub, A0, FP, Oimm addr) ] ++
+			pop_r FP ++
+			push_r A0 ++
+			compile_expr_g e ++
+			pop_r A0 ++
+			pop_r A1 ++
+			mips [ Sw (A0, Areg (0, A1)) ] ++
+			push_r A0
+	| Tcall (f, r, args) ->
 		let p1 =
 			malloc Env.Local.empty
 		in
@@ -160,6 +191,7 @@ and compile_expr = function
 		in
 		let p3 =
 			free () ++
+			(if r then mips [ Lw (A0, Areg (0, A0)) ] else nop) ++
 			push_r A0
 		in p1 ++ p2 ++ p3
 	| Tbinop (op, e1, e2) ->
@@ -265,8 +297,11 @@ and compile_instr = function
 	| Treturn None ->
 		pop_n_bloc (!bloc_count - 2) ++
 		mips [ Jr RA ]
-	| Treturn (Some e) ->
-		compile_expr e ++
+	| Treturn (Some (e, r)) ->
+		(if r
+			then compile_expr_g e
+			else compile_expr   e
+		) ++
 		pop_r A0 ++
 		pop_n_bloc (!bloc_count - 2) ++
 		pop_r RA ++
@@ -292,7 +327,7 @@ let compile tAst =
 		tAst.globals;
 	let pre =
 		malloc tAst.globals ++
-		compile_expr (Tcall (Tfun "main", []))
+		compile_expr (Tcall (Tfun "main", false, []))
 	in
 	global_env := Env.decl !global_env;
 	let code = List.map compile_decl tAst.declarations in

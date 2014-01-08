@@ -153,7 +153,7 @@ and ty =
 	| TyInt
 	| TyClass of string
 	| TyPointer of ty
-	| TyFun of ty * string list * (ty * bool) Env.Local.t (* bonne idée ou pas ? *)
+	| TyFun of ty * bool * string list * (ty * bool) Env.Local.t (* bonne idée ou pas ? *)
 
 
 and t_decl =
@@ -166,7 +166,7 @@ and t_instr =
 	| Tfor of t_expr list * t_expr * t_expr list * t_instr list
 	| Tcout_expr of t_expr
 	| Tcout_str of string
-	| Treturn of t_expr option
+	| Treturn of (t_expr * bool) option
 	| Tmalloc of (ty * bool) Env.Local.t
 	| Tfree
 
@@ -177,7 +177,8 @@ and t_expr =
 	| Tvar  of string
 	| Tfun of string
 	| Tassign of t_expr * t_expr
-	| Tcall of t_expr * t_expr list
+	| Trefinit of string * t_expr
+	| Tcall of t_expr * bool * t_expr list
 	| Tbinop of t_binop * t_expr * t_expr
 	| Tnot of t_expr
 	| Tincrleft of t_expr

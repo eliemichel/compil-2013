@@ -65,11 +65,11 @@ let map f = stack_map (Local.map f)
 let filter f = stack_map (Local.filter f)
 
 let of_bool_env env =
-	let env' = filter (fun _ -> snd) env in
-		map fst env'
+	let env' = filter (fun _ (_, _, b) -> b) env in
+		map (fun (t, r, _) -> (t, r)) env'
 
 
-let decl env = map (fun (t, _) -> (t, true)) env
+let decl env = map (fun (t, r, _) -> (t, r, true)) env
 
 let print_local print_node ff local =
 	Local.iter (fun k v -> Printf.fprintf ff "%a ; " print_node (k, v)) local
