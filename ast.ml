@@ -153,8 +153,9 @@ and ty =
 	| TyInt
 	| TyClass of string
 	| TyPointer of ty
-	| TyFun of ty * bool * string list * (ty * bool) Env.Local.t (* bonne idée ou pas ? *)
+	| TyFun of tfun list
 
+and tfun = ty * bool * string list * (ty * bool) Env.Local.t
 
 and t_decl =
 	| Tdeclfun of string * bool * string list * (ty * bool) Env.Local.t * t_instr list

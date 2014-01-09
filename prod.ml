@@ -6,13 +6,10 @@ let get_new_data_label () =
 	let s = "data_" ^ (string_of_int !data_i) in
 	incr data_i; s
 
-let fun_labels : (string, unit) Hashtbl.t = Hashtbl.create 17
-
 let cont_i = ref 0
-let rec get_new_control_label () =
+let get_new_control_label () =
 	let s = "cont_" ^ (string_of_int !cont_i) in
-	incr cont_i;
-	if Hashtbl.mem fun_labels s then get_new_control_label () else s
+	incr cont_i; s
 
 let data = ref []
 let bloc_count = ref 0
@@ -162,7 +159,7 @@ and compile_expr = function
 			pop_r FP ++
 			push_r A0
 	| Tfun s ->
-		mips [ La (A0, s) ] ++
+		mips [ La (A0, "fun_" ^ s) ] ++
 		push_r A0
 	| Tassign (e1, e2) ->
 		compile_expr_g e1 ++
@@ -341,14 +338,11 @@ let compile_decl = function
 			mips [ Jr RA ]
 		in
 		ignore (free ());
-			mips [ Label s ] ++
+			mips [ Label ("fun_" ^ s) ] ++
 			push_r RA ++
 			body
 
 let compile tAst =
-	Env.Local.iter
-		(fun key _ -> Hashtbl.replace fun_labels key ())
-		tAst.globals;
 	let pre =
 		malloc tAst.globals ++
 		compile_expr (Tcall (Tfun "main", false, []))

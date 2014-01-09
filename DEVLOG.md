@@ -188,5 +188,11 @@ références (le passage par référence plantait) ainsi que gérer des cas comm
 l'absence de `return` auxquels je n'avais pas pensé. J'avais également oublié
 l'évaluation paresseuse des booléens.
 
+Doit-on gérer la surcharge des fonctions ? Je suppose que oui puisqu'on l'a pour les
+méthodes.
+
+
+
+
 
 

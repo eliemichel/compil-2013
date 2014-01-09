@@ -18,6 +18,12 @@ void swap (int *x, int *y) {
 int &ref (int *i) {
 	return *i;
 }
+/*
+void swap (int **x, int **y) {
+	int *t = *x;
+	*x = *y;
+	*y = t;
+}*/
 
 int main() {
 	std::cout << "\nThe answer " << "is ";
@@ -86,6 +92,9 @@ int main() {
 	int& r0 = ref(&a0);
 	ref(&a0) = 128;
 	std::cout << "r0 = " << r0 << "\n";
+	
+	int *pa; int *pb;
+	//swap(&pa, &pb);
 	
 	return 0;
 }

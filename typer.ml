@@ -92,8 +92,11 @@ let type_proto env proto =
 	let args, local_env = List.fold_right
 		(fun (t, v) (l, loc) ->
 			let t, s, r = decl_var_extract_name t v in
-				s.node :: l,
-				Env.Local.add s.node (t, r) loc
+				if Env.Local.mem s.node loc
+				then err s "There is another argument with the same identifier."
+				else
+					s.node :: l,
+					Env.Local.add s.node (t, r) loc
 		)
 		proto.args
 		([], Env.Local.empty)
