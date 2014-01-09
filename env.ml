@@ -64,6 +64,8 @@ let map f = stack_map (Local.map f)
 
 let filter f = stack_map (Local.filter f)
 
+let remove k = stack_map (Local.remove k)
+
 let of_bool_env env =
 	let env' = filter (fun _ (_, _, b) -> b) env in
 		map (fun (t, r, _) -> (t, r)) env'

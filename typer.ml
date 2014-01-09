@@ -15,7 +15,8 @@ let rec string_of_ty = function
 	| TyInt            -> "int"
 	| TyClass s        -> s
 	| TyPointer t      -> (string_of_ty t) ^ "*"
-	| TyFun (rt, r, args, argenv) ->
+	| TyFun []         -> ""
+	| TyFun ((rt, r, args, argenv) :: q) ->
 		"Function : " ^
 		(List.fold_left
 			(fun s v ->
@@ -29,7 +30,8 @@ let rec string_of_ty = function
 		) ^
 		" -> " ^
 		(string_of_ty rt) ^
-		(if r then "&" else "")
+		(if r then "& and " else " and ") ^
+		(string_of_ty (TyFun q))
 
 
 let rec convert_type = function
@@ -88,6 +90,14 @@ let decl_glob_var env t v =
 			Hashtbl.add globals s.node t;
 			decl_var env t s r
 
+let rec compatible a b = match a, b with
+	| [], [] -> true
+	| arg :: q, 
+	| _ -> false
+
+let check_proto_compatibility args q =
+	not (List.exists (compatible args) q)
+
 let type_proto env proto =
 	let args, local_env = List.fold_right
 		(fun (t, v) (l, loc) ->
@@ -104,7 +114,14 @@ let type_proto env proto =
 	match proto.start with
 		| Function (t, qvar) ->
 			let t, s, r = decl_function_extract_name t qvar in
-			let ty = TyFun (t, r, args, local_env) in
+			let env, q = 
+				try let q = Env.find s.node env in
+					if not (check_proto_compatibility args q)
+					then err s ("ambiguate declaration of " ^ s.node) (*TODO : expliciter le message d'erreur*)
+					else Env.remove s.node env, q
+				with Not_found -> env, []
+			in
+			let ty = (TyFun (t, r, args, local_env)) :: q in
 				let env = decl_var env ty s r in
 					env, local_env, args, ty, s, t = TyVoid
 		| Constructor s   -> err s ("Constructor of " ^ s.node ^ " out of class declaration")
