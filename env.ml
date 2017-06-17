@@ -1,3 +1,4 @@
+open Format
 
 exception Empty_env
 
@@ -55,6 +56,11 @@ let find_local key = function
 	| Root -> raise Not_found
 	| Bloc (local, _) -> Local.find key local
 
+let rec fold f env i = match env with
+	| Root -> i
+	| Bloc (local, parent) ->
+		fold f parent (Local.fold f local i)
+
 let rec stack_map f = function
 	| Root -> Root
 	| Bloc (local, parent) ->
@@ -64,8 +70,6 @@ let map f = stack_map (Local.map f)
 
 let filter f = stack_map (Local.filter f)
 
-let remove k = stack_map (Local.remove k)
-
 let of_bool_env env =
 	let env' = filter (fun _ (_, _, b) -> b) env in
 		map (fun (t, r, _) -> (t, r)) env'
@@ -74,12 +78,12 @@ let of_bool_env env =
 let decl env = map (fun (t, r, _) -> (t, r, true)) env
 
 let print_local print_node ff local =
-	Local.iter (fun k v -> Printf.fprintf ff "%a ; " print_node (k, v)) local
+	Local.iter (fun k v -> fprintf ff "%a ; " print_node (k, v)) local
 
 let rec print print_node ff = function
-	| Root -> Printf.fprintf ff " |"
+	| Root -> fprintf ff " |"
 	| Bloc (local, parent) ->
-		Printf.fprintf ff "[%a] -- %a"
+		fprintf ff "[%a] -- %a"
 			(print_local print_node) local
 			(print print_node) parent
 

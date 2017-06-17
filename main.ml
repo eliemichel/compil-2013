@@ -1,4 +1,4 @@
-(* réponse à La Grande Question sur la vie, l'univers et le reste *)
+open Format
 
 let parse_only = ref false
 let type_only = ref false
@@ -10,8 +10,8 @@ let get_pos start_pos end_pos =
 
 let print_error filename msg start_pos end_pos =
 	let line, sp, ep = get_pos start_pos end_pos in
-	Printf.eprintf
-		"File \"%s\", line %d, caracters %d-%d:\n%s\n"
+	eprintf
+		"File \"%s\", line %d, caracters %d-%d:\n%s@."
 		filename
 		line
 		sp
@@ -47,6 +47,7 @@ let main filename =
 			)
 		| _ -> exit 2
 	in
+	eprintf "Parsing done.@.";
 	if !parse_only then exit 0
 	else
 	let tAst =
@@ -59,9 +60,10 @@ let main filename =
 			)
 		(*| _ -> exit 2 TODO : décommenter*)
 	in
+	eprintf "Typing done.@.";
 	if !type_only then exit 0
 	else
-		Format.printf "%a" Mips.print_program (Prod.compile tAst);
+		printf "%a" Mips.print_program (Prod.compile tAst);
 		exit 0
 
 let () = Arg.parse

@@ -160,8 +160,10 @@ Ajout des opérateurs unaires. Les pointeurs sont maintenant gérés.
 
 Faire attention aux autres types d'entier !! (octal et hexa)
 
-J'ai géré les entités \x** dans les chaînes mais pour une raisons qui m'est inconnue
-(peut-être à cause de mars) le caractère ESC (\x1b) ne fonctionne pas…
+J'ai géré les entités \x** dans les chaînes mais pour une raisons qui m'est
+inconnue (peut-être à cause de mars) le caractère ESC (\x1b) ne fonctionne pas…
+En fait la conversion en char d'ocaml n'utilise pas les mêmes conventions que
+le shell.
 
 ## 08/01/2014
 
@@ -178,7 +180,7 @@ sans avoir à modifier tout le code.
 
 
 c'est bizarre, l'annoncé impose pas de vérifier que la valeur du return est bien typée.
-Enfin je vais le faire quand même.
+Enfin je vais le faire quand même. -> Si en fait
 
 Pour les appels de fonctions, les types doivent-ils être exactement égaux ou juste
 être des sous-types ? Après tout, ce ne sont que des assignations.
@@ -190,6 +192,64 @@ l'évaluation paresseuse des booléens.
 
 Doit-on gérer la surcharge des fonctions ? Je suppose que oui puisqu'on l'a pour les
 méthodes.
+
+Bon je préfère commencer les objets plutôt.
+
+TODO : vérifier l'inclusion de iostream et la présence de `int main () {}`
+
+## 09/01/2014
+
+Astuce intéressante : les identifiants n'étant pas autorisés à contenir de points
+par exemples, il n'est pas dangereux de donner un sens particulier à ce caractère
+dans les clefs d'accès à l'environnement. Cela permet d'éviter les conflits entre
+attributs et variables, et pourra aussi servir (en utilisant un autre caractère que
+le point) à gérer la surcharge. J'ai été obligé d'utiliser un point plutôt que
+`::` car les deux points sont interprétés par MIPS comme une fin de label. Cela
+se répercute sur les messages d'erreur qui affichent `A.attr` plutôt que `A::attr`
+
+Déclaration d'attributs ok, avec un code plus propre que le reste je trouve. Parce
+que le reste du code du typer est vraiment mal organisé je trouve.
+
+Est-ce que `class int` est autorisé ? -> Non
+
+Pour le traitement des classes, je commence par une session de typing only, le temps
+d'organiser les structures pour supporter les objets.
+
+Mon typeur permet le prototypage des fonctions bien que le lexeur ne l'autorise pas.
+
+Mes fonctions sont trop longues.
+
+Il faudra penser à ajouter les constructeurs pour les classes qui ne le
+spécifient pas.
+
+
+Méga hack :
+
+		int hack0() {
+			std::cout << "";
+		}
+		
+		void f() {
+			std::cout << "0123456789-0123456789";
+		}
+		
+		int hack1() {
+			std::cout << "";
+		}
+		
+		int main() {
+			std::cout << "Length of \"";
+			f();
+			// Le -2 compense les deux caractères de fin de chaîne
+			std::cout << "\": " << hack0() - hack1() - 2 << "\n";
+		}
+
+
+Registre particulier pour stocker `this` : T0
+
+En fait je vais allouer les objets sur la pile, sauf pour le `new`
+En fait non... Et c'est bon, les appels de membres fonctionnent (modulo la
+saleté de l'implémentation)
 
 
 

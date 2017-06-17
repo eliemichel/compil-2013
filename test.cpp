@@ -1,8 +1,17 @@
 #include <iostream>
 // ./minic++ test.cpp 1> /tmp/mips1.s && echo "-=-=-=-=-" && cat /tmp/mips1.s && echo "-=-=-=-=-" && mars /tmp/mips1.s
 
-int i, j;
+class A {
+	public:
+	int x;
+	int getX();
+	/*int getX2();
+	void setX(int x);
+	void setX2(int y);*/
+	A(int x);
+};
 
+/*
 int fun (int x, int y) {
 	int z = x - y;
 	return z;
@@ -14,52 +23,43 @@ void swap (int *x, int *y) {
 	*y = t;
 	return;
 }
+*/
+A::A(int z) {
+	x = z;
+	/*x = 2;
+	int x = 4;
+	this->getX();*/
+}
+
+int A::getX() {
+	return this->x;
+}
+/*
+int A::getX2() {
+	return x;
+}
+
+void A::setX(int x) {
+	this->x = x;
+}
+
+void A::setX2(int y) {
+	x = y;
+	x = 2;
+}
+
 
 int &ref (int *i) {
 	return *i;
 }
-/*
-void swap (int **x, int **y) {
-	int *t = *x;
-	*x = *y;
-	*y = t;
-}*/
+*/
 
 int main() {
-	std::cout << "\nThe answer " << "is ";
-	std::cout << (i = ((43 - 1)  + 360 * 27) % 360) << "\n" << i;
-	i = 5 + 2 * 42;
-	std::cout << "..." << i - 47;
-	if (i < 0)
-		std::cout << " i est strictement negatif ";
-	else
-		std::cout << " i est positif ";
 	
-	int k = 5;
-	if (true) {
-		k = 2;
-		std::cout << "| k = " << k << " ";
-		int k = 10;
-		std::cout << "| k = " << k << " ";
-	}
-	std::cout << "| k = " << k << " ";
+	A a = A(4);
+	std::cout << a.x << "\n";
 	
-	i = 0;
-	while (i < 10) {
-		std::cout << " i = " << i << "   ";
-		i = i + 1;
-	}
-	
-	i = 0;
-	int j = 47;
-	std::cout << "| fun (j) = " << fun (j, 10);
-	
-	
-	int *p = &j;
-	std::cout << " (" << !(*p) << ") j = " << j << "\n";
-	
-	
-	std::cout << "\x1b[32;01m*Vert*\x1b[0m\n"; // affiche rien…
+	//std::cout << "\x1b[32;01m*Vert*\x1b[0m\n"; // affiche rien…
 	/*
 	std::cout << "\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f\n";
 	std::cout << "\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3a\x3b\x3c\x3d\x3e\x3f\n";
@@ -69,33 +69,7 @@ int main() {
 	std::cout << "\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7a\x7b\x7c\x7d\x7e\x7f\n";
 	*/
 	
-	
-	int a = 5;
-	int b = 1;
-	std::cout << "a = " << a << " et b = " << b << "\nswap...\n";
-	swap(&a, &b);
-	std::cout << "a = " << a << " et b = " << b << "\n";
-	
-	std::cout << "p = " << *p << "\n";
-	
-	int &t = a;
-	t = 7;
-	std::cout << "a = " << a << "\n";
-	
-	int foo = 0;
-	for (; foo < 10 ; foo++) {
-		std::cout << foo << "\n";
-		int foo = 0;
-	}
-	
-	int a0 = 75;
-	int& r0 = ref(&a0);
-	ref(&a0) = 128;
-	std::cout << "r0 = " << r0 << "\n";
-	
-	int *pa; int *pb;
-	//swap(&pa, &pb);
-	
+	std::cout << "Done.\n";
 	return 0;
 }
 

@@ -1,5 +1,8 @@
 open Ast
 open Mips
+open Format
+
+let is_meth = ref false
 
 let data_i = ref 0
 let get_new_data_label () =
@@ -14,6 +17,8 @@ let get_new_control_label () =
 let data = ref []
 let bloc_count = ref 0
 let global_env : (int * bool * bool) Env.t ref = ref Env.empty (* Une variable globale… pas beau, mais pratique *)
+let class_env : int Env.Local.t ref = ref Env.Local.empty (* une autre, parce que la première marche bien finalement *)
+let size_env : int Env.Local.t ref = ref Env.Local.empty
 
 let push n = mips [ Arith (Mips.Sub, SP, SP, Oimm n) ]
 let pop n = mips [ Arith (Mips.Add, SP, SP, Oimm n) ]
@@ -100,8 +105,8 @@ let rec pop_n_bloc = function
 
 let rec compile_expr_g = function
 	| Tthis | Tnull | Tint _ | Tassign _ | Trefinit _ | Tbinop  _
-	| Tfun _ | Tnot _ | Tincrleft _ | Tdecrleft _ | Tincrright _ | Tdecrright _
-	| Tgetaddr _ | Tcall (_,false,_)
+	| Tfun _ | Tlocalmeth _ | Tnot _ | Tincrleft _ | Tdecrleft _ | Tincrright _
+	| Tdecrright _ | Tgetaddr _ | Tcall (_,false,_) | Tnew _ | Tmeth _
 		-> assert false
 	| Tcall (f, true, args) ->
 		let p1 =
@@ -130,7 +135,19 @@ let rec compile_expr_g = function
 			] ++
 			pop_r FP ++
 			push_r A0
-	| Tdereference e ->
+	| Tlocalattr s ->
+		let off = Env.Local.find s !class_env in
+			mips [ Arith (Mips.Add, A0, T0, Oimm off) ] ++
+			push_r A0
+	| Tattr (e, s) ->
+		let off = Env.Local.find s !class_env in
+			push_r T0 ++
+			compile_expr e ++
+			pop_r T0 ++
+			mips [ Arith (Mips.Add, A0, T0, Oimm off) ] ++
+			pop_r T0 ++
+			push_r A0
+	| Tderef e ->
 		compile_expr e
 
 
@@ -144,14 +161,19 @@ and compile_args args =
 and compile_exprs i = List.fold_right (++) (List.map compile_expr i) nop
 
 and compile_expr = function
-	| Tthis  -> raise TODO
+	| Tthis  ->
+		mips [
+			Sw (T0, Alab("this"));
+			La (A0, "this");
+		] ++
+		push_r A0
 	| Tnull  -> mips [ Li (A0, "0") ] ++ push_r A0
 	| Tint i -> mips [ Li (A0,  i ) ] ++ push_r A0
 	| Tvar s ->
 		let env = Env.of_bool_env !global_env in
 		let (addr, r), iter = Env.find_and_localize s env in
-			(*Printf.eprintf "%s addr %d iter %d\n" s addr iter;
-			Printf.eprintf "%a\n" (Env.print test_ib) !global_env;*)
+			(*eprintf "%s addr %d iter %d@." s addr iter;
+			eprintf "%a@." (Env.print test_ib) !global_env;*)
 			push_r FP ++
 			search_locals iter ++
 			mips [ Lw (A0, Areg (-addr, FP)) ] ++
@@ -161,6 +183,34 @@ and compile_expr = function
 	| Tfun s ->
 		mips [ La (A0, "fun_" ^ s) ] ++
 		push_r A0
+	| Tlocalattr s ->
+		let off = Env.Local.find s !class_env in
+			mips [ Lw (A0, Areg (off, T0)) ] ++
+			push_r A0
+	| Tlocalmeth s ->
+		let off = Env.Local.find s !class_env in
+			mips [ Lw (A0, Areg (0, T0)) ] ++
+			mips [ Lw (A0, Areg (off, A0)) ] ++
+			push_r A0
+	| Tattr (e, s) ->
+		let off = Env.Local.find s !class_env in
+			push_r T0 ++
+			compile_expr e ++
+			pop_r T0 ++
+			mips [ Lw (A0, Areg (off, T0)) ] ++
+			pop_r T0 ++
+			push_r A0
+	| Tmeth (e, s) ->
+		is_meth := true;
+		let off = Env.Local.find s !class_env in
+			push_r T0 ++
+			compile_expr e ++
+			pop_r T0 ++
+			mips [
+				Lw (A0, Areg (0, T0));
+				Lw (A0, Areg (off, A0));
+			] ++
+			push_r A0
 	| Tassign (e1, e2) ->
 		compile_expr_g e1 ++
 		compile_expr   e2 ++
@@ -190,11 +240,47 @@ and compile_expr = function
 			compile_expr f ++
 			pop_r A0 ++
 			mips [ Jalr A0 ] ++
-			pop_r A0
+			pop_r A0 ++
+			(if !is_meth then pop_r T0 else nop)
 		in
 		let p3 =
 			free () ++
 			(if r then mips [ Lw (A0, Areg (0, A0)) ] else nop) ++
+			push_r A0
+		in
+			is_meth := false;
+			p1 ++ p2 ++ p3 (* 'astuce' pour forcer l'ordre d'évaluation (nécessaire
+		                     à cause de l'utilisation d'effets de bord -- d'un
+		                     environnement global) *)
+	| Tnew (s, args) ->
+		let k = sprintf "%s.%s" s s in
+		(* +4 : l'adresse en plus est la variable 'contenant' l'objet *)
+		let size = string_of_int (4 + Env.Local.find s !size_env) in
+		let p1 = 
+			push_r T0 ++
+			mips [
+				Li (A0, size);
+				Li (V0, "9");
+				Syscall;
+				Arith (Mips.Add, T0, V0, Oimm 4);
+				Sw (T0, Areg(0, V0));
+			] ++
+			push_r V0 ++
+			mips [
+				La (A0, "descr_" ^ s);
+				Sw (A0, Areg(0, T0))
+			] ++
+			malloc Env.Local.empty
+		in
+		let p2 =
+			compile_args args ++
+			mips [ Jal ("fun_" ^ k) ] ++
+			pop_r A0
+		in
+		let p3 =
+			free () ++
+			pop_r A0 ++
+			pop_r T0 ++
 			push_r A0
 		in p1 ++ p2 ++ p3
 	| Tbinop (Tlazy op, e1, e2) ->
@@ -258,7 +344,7 @@ and compile_expr = function
 		push_r A0
 	| Tgetaddr e ->
 		compile_expr_g e
-	| Tdereference e ->
+	| Tderef e ->
 		compile_expr e ++
 		pop_r A0 ++
 		mips [ Lw (A0, Areg (0, A0)) ] ++
@@ -322,6 +408,35 @@ and compile_instr = function
 		pop_r RA ++
 		push_r A0 ++
 		mips [ Jr RA ]
+	| Tconstr (e, s, args) ->
+		let k = sprintf "%s.%s" s s in
+		let size = string_of_int (Env.Local.find s !size_env) in
+		let p0 =
+			push_r T0 ++
+			compile_expr_g e
+		in
+		let p1 =
+			mips [
+				Li (A0, size);
+				Li (V0, "9");
+				Syscall;
+				Move (T0, V0);
+				La (A0, "descr_" ^ s);
+				Sw (A0, Areg(0, T0))
+			] ++
+			malloc Env.Local.empty
+		in
+		let p2 =
+			compile_args args ++
+			mips [ Jal ("fun_" ^ k) ] ++
+			pop_r A0
+		in
+		let p3 =
+			free () ++
+			pop_r A1 ++
+			mips [ Sw (T0, Areg(0, A1)) ] ++
+			pop_r T0
+		in p0 ++ p1 ++ p2 ++ p3		
 	| Tmalloc env  -> malloc env
 	| Tfree        -> free ()
 
@@ -342,7 +457,35 @@ let compile_decl = function
 			push_r RA ++
 			body
 
+let make_descr cl env (senv, cenv, l) =
+	let count_attr = ref 0 in
+	let count_meth = ref (-4) in
+	
+	let aux k t (e, l) = match t with
+		| TyFun _ ->
+			count_meth := !count_meth + 4;
+			Env.Local.add k !count_meth e,
+			(Waddr ("fun_" ^ k)) :: l
+		| _       ->
+			count_attr := !count_attr + 4;
+			Env.Local.add k !count_attr e,
+			l
+	in
+	let cenv', descr = Env.Local.fold aux env (cenv, []) in
+	let senv' = Env.Local.add cl (!count_attr + 4) senv in
+		senv', cenv', Word ("descr_" ^ cl, List.rev descr) :: l
+(*eprintf "%a\n" (Env.print_local (fun ff (k,i) -> fprintf ff "(%s -> %d)" k i)) cenv;*)
+
 let compile tAst =
+	let this = Word ("this", [ Wint 0 ]) in
+	(*  ^^^^ petit hack pas beau pour avoir une variable vers laquelle pointer *)
+	let senv, cenv, descr = Env.Local.fold
+		make_descr
+		tAst.classes
+		(Env.Local.empty,Env.Local.empty, [ this ])
+	in
+	class_env := cenv;
+	size_env := senv;
 	let pre =
 		malloc tAst.globals ++
 		compile_expr (Tcall (Tfun "main", false, []))
@@ -352,9 +495,10 @@ let compile tAst =
 	let fonctions = List.fold_right (++) code nop in
 	let post = free () ++ mips [ Li (V0, "10") ; Syscall ] in
 	
+	
 	{
 		text = pre ++ post ++ fonctions;
-		data = !data
+		data = descr @ !data
 	}
 
 

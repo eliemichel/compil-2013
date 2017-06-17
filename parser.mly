@@ -101,7 +101,7 @@ supers:
 
 
 member:
-	| d = decl_vars          { Decl_vars_in_member d                         }
+	| d = decl_vars          { Decl_attr d                                   }
 	| v = ioption(VIRTUAL) p = proto SEMCOL
 	                         { if v = None then Proto p else Virtual_proto p }
 
@@ -122,7 +122,8 @@ argument:
 start_proto:
 	| t = type_ v = qvar              { Function    (t, v)   }
 	| id = position(TIDENT)           { Constructor id       }
-	| ns = TIDENT COL COL id = TIDENT { Method      (ns, id) }
+	| ns = position(TIDENT) COL COL id = position(TIDENT)
+	                                  { Qualified_constructor (ns, id) }
 
 
 bloc:
@@ -170,8 +171,15 @@ expr_flow:
 
 var_val:
 	| EQ e = expr   { Value e           }
-	| EQ id = TIDENT LPAR le = separated_list(COMMA, expr) RPAR
-	                { Returned (id, le) }
+	| EQ id = position(TIDENT)
+		LPAR le = position(separated_list(COMMA, expr)) RPAR
+	    { Returned
+	    	{
+	    		node = (id.node, le.node);
+	    		start_pos = id.start_pos;
+	    		end_pos = le.end_pos
+	    	}
+		}
 
 expr:
 	e = position(expr_node) {e}
@@ -184,7 +192,8 @@ expr_node:
 	| n = INTEGER                                  { Integer n                }
 	| id = qident                                  { QIdent id                }
 	| e = expr DOT   id = IDENT                    { Dot (e, id)              }
-	| e = expr ARROW id = IDENT                    {
+	| e = expr ARROW id = IDENT
+	{
 		Dot (
 			{
 				node = Unop (Star, e);
@@ -193,7 +202,7 @@ expr_node:
 			},
 			id
 			)
-	                                                                          }
+	}
 	| e1 = expr EQ e2 = expr                       { Eq    (e1, e2)           }
 	| f = expr LPAR le = separated_list(COMMA, expr) RPAR
 	                                               { Application (f, le)      }
